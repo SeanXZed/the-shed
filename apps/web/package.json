@@ -1,0 +1,33 @@
+{
+  "name": "@the-shed/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@the-shed/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.46.1",
+    "@tanstack/react-query": "^5.62.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4",
+    "lucide-react": "^0.468.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.1",
+    "tailwindcss": "^3.4.15",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "typescript": "*"
+  }
+}
