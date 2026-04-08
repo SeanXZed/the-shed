@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserId, getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
 const endSessionSchema = z.object({
   ended_at: z.string().datetime(),
@@ -21,8 +21,7 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = getSupabaseAdmin() as any;
+  const db = getSupabaseRlsClient(request);
 
   const { data, error } = await db
     .from('practice_sessions')

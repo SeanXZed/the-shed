@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserId, getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
 const createSessionSchema = z.object({
   practice_mode: z.enum(['full_scale', 'full_chord', 'sequence', '251', 'interval']),
@@ -18,8 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = getSupabaseAdmin() as any;
+  const db = getSupabaseRlsClient(request);
   const { data, error } = await db
     .from('practice_sessions')
     .insert({ user_id: userId, ...parsed.data })

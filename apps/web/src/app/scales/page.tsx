@@ -113,7 +113,7 @@ export default function ScalesPage() {
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-6 pt-2">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-2 sm:p-6 sm:pt-2">
           <div>
             <h1 className="text-3xl">{tr.scaleLibraryTitle}</h1>
             <p className="text-muted-foreground">{tr.scaleLibrarySubtitle}</p>

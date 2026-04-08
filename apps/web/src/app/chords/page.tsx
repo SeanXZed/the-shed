@@ -159,7 +159,7 @@ export default function ChordsPage() {
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-6 pt-2">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-2 sm:p-6 sm:pt-2">
           <div>
             <h1 className="text-3xl">{tr.chordLibraryTitle}</h1>
             <p className="text-muted-foreground">{tr.chordLibrarySubtitle}</p>
@@ -228,32 +228,40 @@ export default function ChordsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ quality, root, symbol, tones, degrees, card }) => {
+                  {rows.map(({ quality, root, tones, degrees, card }) => {
                     const displayRoot = isBb ? transposeNote(root, BB_OFFSET) : root;
                     const displayTones = isBb ? transposeNotes(tones, BB_OFFSET) : tones;
                     const displaySymbol = `${displayRoot}${CHORD_SUFFIX[quality]}`;
                     return (
-                    <tr
-                      key={`${quality}:${root}`}
-                      className="border-b last:border-0 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-4 py-2 font-mono font-semibold">{displaySymbol}</td>
-                      <td className="px-4 py-2 hidden sm:table-cell text-muted-foreground">{qualityLabel(quality, tr)}</td>
-                      <td className="px-4 py-2 font-mono text-xs leading-relaxed">
-                        <div className="text-foreground tracking-wide">{displayTones.join('  ')}</div>
-                        <div className="text-muted-foreground tracking-wide">{degrees.join('  ')}</div>
-                      </td>
-                      <td className="px-4 py-2 hidden lg:table-cell text-xs text-muted-foreground">
-                        {QUALITY_SCALES[quality].join(', ')}
-                      </td>
-                      <td className={cn('px-4 py-2 hidden md:table-cell tabular-nums text-xs', card ? relativeClass(card.next_review) : 'text-muted-foreground')}>
-                        {card ? relativeTime(card.next_review, tr) : '—'}
-                      </td>
-                      <td className="px-4 py-2 hidden md:table-cell text-muted-foreground tabular-nums text-xs">
-                        {card ? card.repetitions : '—'}
-                      </td>
-                    </tr>
-                  ); })}
+                      <tr
+                        key={`${quality}:${root}`}
+                        className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="px-4 py-2 font-mono font-semibold">{displaySymbol}</td>
+                        <td className="px-4 py-2 hidden sm:table-cell text-muted-foreground">
+                          {qualityLabel(quality, tr)}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-xs leading-relaxed">
+                          <div className="text-foreground tracking-wide">{displayTones.join('  ')}</div>
+                          <div className="text-muted-foreground tracking-wide">{degrees.join('  ')}</div>
+                        </td>
+                        <td className="px-4 py-2 hidden lg:table-cell text-xs text-muted-foreground">
+                          {QUALITY_SCALES[quality].join(', ')}
+                        </td>
+                        <td
+                          className={cn(
+                            'px-4 py-2 hidden md:table-cell tabular-nums text-xs',
+                            card ? relativeClass(card.next_review) : 'text-muted-foreground',
+                          )}
+                        >
+                          {card ? relativeTime(card.next_review, tr) : '—'}
+                        </td>
+                        <td className="px-4 py-2 hidden md:table-cell text-muted-foreground tabular-nums text-xs">
+                          {card ? card.repetitions : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {rows.length === 0 && (

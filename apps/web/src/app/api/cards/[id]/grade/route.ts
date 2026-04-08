@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { nextSM2State } from '@the-shed/shared';
-import { getUserId, getSupabaseAdmin } from '@/lib/supabase/server';
+import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
 const gradeSchema = z.object({
   grade: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   session_id: z.string().uuid().optional(),
   practice_mode: z.string().optional(),
+  is_cram: z.boolean().optional(),
 });
 
 export async function POST(
@@ -22,8 +23,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = getSupabaseAdmin() as any;
+  const db = getSupabaseRlsClient(request);
 
   const { data: card, error: fetchError } = await db
     .from('cards')
@@ -39,34 +39,45 @@ export async function POST(
     );
   }
 
-  const nextState = nextSM2State(
-    {
-      ease_factor: card.ease_factor,
-      interval_days: card.interval_days,
-      repetitions: card.repetitions,
-      next_review: new Date(card.next_review),
-      last_reviewed_at: card.last_reviewed_at ? new Date(card.last_reviewed_at) : new Date(),
-    },
-    parsed.data.grade,
-  );
+  const isCram = parsed.data.is_cram === true;
+  const currentState = {
+    ease_factor: card.ease_factor,
+    interval_days: card.interval_days,
+    repetitions: card.repetitions,
+    next_review: new Date(card.next_review),
+    last_reviewed_at: card.last_reviewed_at ? new Date(card.last_reviewed_at) : null,
+  };
 
-  const { error: updateError } = await db
-    .from('cards')
-    .update({
-      ease_factor: nextState.ease_factor,
-      interval_days: nextState.interval_days,
-      repetitions: nextState.repetitions,
-      next_review: nextState.next_review.toISOString(),
-      last_reviewed_at: nextState.last_reviewed_at.toISOString(),
-    })
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  if (updateError) {
-    return NextResponse.json(
-      { error: 'Failed to update card', detail: updateError.message },
-      { status: 500 },
+  if (!isCram) {
+    const nextState = nextSM2State(
+      {
+        ease_factor: currentState.ease_factor,
+        interval_days: currentState.interval_days,
+        repetitions: currentState.repetitions,
+        next_review: currentState.next_review,
+        last_reviewed_at: currentState.last_reviewed_at ?? new Date(),
+      },
+      parsed.data.grade,
     );
+
+    const { error: updateError } = await db
+      .from('cards')
+      .update({
+        ease_factor: nextState.ease_factor,
+        interval_days: nextState.interval_days,
+        repetitions: nextState.repetitions,
+        next_review: nextState.next_review.toISOString(),
+        last_reviewed_at: nextState.last_reviewed_at.toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: 'Failed to update card', detail: updateError.message },
+        { status: 500 },
+      );
+    }
   }
 
   // Record practice event if session context was provided
@@ -83,7 +94,8 @@ export async function POST(
   }
 
   return NextResponse.json({
-    next_review: nextState.next_review.toISOString(),
-    interval_days: nextState.interval_days,
+    next_review: currentState.next_review.toISOString(),
+    interval_days: currentState.interval_days,
+    wrote_sm2: !isCram,
   });
 }

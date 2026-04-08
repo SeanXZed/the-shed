@@ -57,7 +57,7 @@ export default function DashboardPage() {
           </Breadcrumb>
         </header>
 
-        <div className="flex flex-1 flex-col gap-6 p-6 pt-2">
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-2 sm:p-6 sm:pt-2">
           <div>
             <h1 className="text-3xl">{tr.welcomeBack}</h1>
             <p className="text-muted-foreground">{tr.welcomeSub}</p>
@@ -123,7 +123,7 @@ export default function DashboardPage() {
           </div>
 
           {/* CTA */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <Link href="/practice" className={buttonVariants({ size: "lg" })}>
               <Music2 className="mr-2 size-4" />
               {tr.startPractice}

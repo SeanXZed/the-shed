@@ -49,14 +49,7 @@ const SLUG_TO_DB_MODE: Record<string, string> = {
   '251': '251',
 };
 
-const SESSION_SIZE = 50;
-const SLUG_TO_LABEL: Partial<Record<PracticeMode, string>> = {
-  'full-scale': 'all 17 scales',
-  'full-chord': 'all 17 chord voicings',
-  'sequence':   'all 17 scale sequences',
-  '251':        'ii-V-I in this key',
-  'interval':   'all intervals from this root',
-};
+const SESSION_SIZE = 20;
 
 const INTERVALS = [
   { id: 'm2',  name: 'Minor 2nd',   semitones: 1  },
@@ -78,7 +71,7 @@ type PracticeMode = 'full-scale' | 'full-chord' | 'sequence' | '251' | 'interval
 
 type PracticeConfig =
   | { type: 'root-free';      sequenceCount: number }
-  | { type: 'root-selected';  root: Root; sequenceCount: number };
+  | { type: 'root-selected';  roots: Root[]; sequenceCount: number };
 
 interface StandardItem {
   type: 'standard';
@@ -140,7 +133,7 @@ function buildDeck(
   config: PracticeConfig | null,
 ): { deck: DeckItem[]; isCram: boolean } {
   if (mode === 'interval') {
-    const roots = config?.type === 'root-selected' ? [config.root] : [...ROOTS];
+    const roots = config?.type === 'root-selected' ? config.roots : [...ROOTS];
     const items: IntervalItem[] = [];
     for (const root of roots) {
       for (const interval of INTERVALS) {
@@ -156,7 +149,7 @@ function buildDeck(
   }
 
   if (mode === '251') {
-    const keys = config?.type === 'root-selected' ? [config.root] : [...ROOTS];
+    const keys = config?.type === 'root-selected' ? config.roots : [...ROOTS];
     const items: TwoFiveOneItem[] = [];
     for (const key of keys) {
       for (const tonality of ['major', 'minor'] as const) {
@@ -176,7 +169,8 @@ function buildDeck(
 
   // Scale modes (full-scale, full-chord, sequence)
   if (config?.type === 'root-selected') {
-    const rootCards = allCards.filter(c => c.root === config.root);
+    const rootsSet = new Set(config.roots);
+    const rootCards = allCards.filter(c => rootsSet.has(c.root as Root));
     const result: DeckItem[] = [];
     while (result.length < SESSION_SIZE) {
       result.push(...shuffled(rootCards.map(card => ({ type: 'standard' as const, card }))));
@@ -304,6 +298,7 @@ async function gradeCard(
   grade: Grade,
   sessionId?: string,
   practiceMode?: string,
+  isCram?: boolean,
 ): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(`/api/cards/${cardId}/grade`, {
@@ -311,12 +306,34 @@ async function gradeCard(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({
       grade,
+      ...(isCram ? { is_cram: true } : {}),
       ...(sessionId ? { session_id: sessionId, practice_mode: practiceMode } : {}),
     }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
     throw new Error(body.detail ?? body.error ?? `Grade failed (${res.status})`);
+  }
+}
+
+async function gradeInterval(
+  grade: Grade,
+  sessionId?: string,
+  root?: string,
+): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch('/api/interval/grade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+    body: JSON.stringify({
+      grade,
+      ...(sessionId ? { session_id: sessionId } : {}),
+      ...(root ? { root } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
+    throw new Error(body.detail ?? body.error ?? `Interval grade failed (${res.status})`);
   }
 }
 
@@ -555,7 +572,6 @@ function AnswerReview({ userAnswer, score, tr }: { userAnswer: string; score: An
         ) : tokens.map((token, i) => {
           const canon = canonicalNote(token);
           const isCorrect = correct.has(canon);
-          const isWrong = !isCorrect;
           return (
             <span
               key={i}
@@ -656,6 +672,8 @@ export default function PracticeModePage() {
   const sessionIdRef = useRef<string | null>(null);
   const reviewedCountRef = useRef(0);
   const correctCountRef = useRef(0);
+  /** Only rebuild deck + reset index when mode/config change — not when dueCards/allCards refetch after invalidate(). */
+  const deckBuildKeyRef = useRef<string | null>(null);
 
   // Auth gate
   useEffect(() => {
@@ -679,10 +697,17 @@ export default function PracticeModePage() {
     });
   }, [authed, ensured, invalidate]);
 
-  // Build deck once cards + config are ready
+  // Build deck once cards + config are ready (new session only — not on query refetch after grading)
   useEffect(() => {
     if (!ensured || loadingDue || loadingAll || !dueCards || !allCards) return;
-    if (!config) return; // wait for config screen
+    if (!config) {
+      deckBuildKeyRef.current = null;
+      return;
+    }
+    const buildKey = `${practiceMode}:${JSON.stringify(config)}`;
+    if (deckBuildKeyRef.current === buildKey) return;
+
+    deckBuildKeyRef.current = buildKey;
     const { deck: built, isCram: cram } = buildDeck(practiceMode, dueCards, allCards, config);
     setDeck(built);
     setIsCram(cram);
@@ -707,7 +732,7 @@ export default function PracticeModePage() {
         body: JSON.stringify({
           practice_mode: dbMode,
           is_cram: isCram,
-          root: config.type === 'root-selected' ? config.root : null,
+          root: config.type === 'root-selected' && config.roots.length === 1 ? config.roots[0] : null,
           sequence_count: practiceMode === 'sequence' ? config.sequenceCount : null,
         }),
       });
@@ -755,9 +780,8 @@ export default function PracticeModePage() {
       if (e.code === 'Space') {
         e.preventDefault();
         if (!flipped && !done) setFlipped(true);
-        else if (flipped && !done && practiceMode === 'interval') handleNextRef.current?.();
       }
-      if (flipped && !grading && !done && practiceMode !== 'interval') {
+      if (flipped && !grading && !done) {
         if (e.key === '1') handleGradeRef.current?.(1);
         if (e.key === '2') handleGradeRef.current?.(2);
         if (e.key === '3') handleGradeRef.current?.(3);
@@ -822,13 +846,15 @@ export default function PracticeModePage() {
       const sid = sessionIdRef.current ?? undefined;
       const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
       if (item.type === 'standard') {
-        await gradeCard(item.card.id, grade, sid, dbMode);
+        await gradeCard(item.card.id, grade, sid, dbMode, isCram);
       } else if (item.type === '251') {
         await Promise.all([
-          gradeCard(item.cards.ii.id, grade, sid, dbMode),
-          gradeCard(item.cards.V.id, grade, sid, dbMode),
-          gradeCard(item.cards.I.id, grade, sid, dbMode),
+          gradeCard(item.cards.ii.id, grade, sid, dbMode, isCram),
+          gradeCard(item.cards.V.id, grade, sid, dbMode, isCram),
+          gradeCard(item.cards.I.id, grade, sid, dbMode, isCram),
         ]);
+      } else if (item.type === 'interval') {
+        await gradeInterval(grade, sid, item.root);
       }
       reviewedCountRef.current += 1;
       if (grade >= 3) correctCountRef.current += 1;
@@ -839,21 +865,17 @@ export default function PracticeModePage() {
     } finally {
       setGrading(false);
     }
-  }, [grading, deck, index, invalidate, advanceCard]);
+  }, [grading, deck, index, invalidate, advanceCard, practiceMode, isCram]);
 
   // Auto-grade using scoreAnswer's suggestedGrade, then advance.
   // Blank answer → grade 1 (Blackout). Used by the nav Next button.
   const handleAutoNext = useCallback(async () => {
     const item = deck[index];
     if (!item) return;
-    if (item.type === 'interval') {
-      advanceCard(index + 1);
-      return;
-    }
     const expected = getExpectedNotes(item, practiceMode, sequence, isBb);
     const s = userAnswer.trim() ? scoreAnswer(userAnswer, expected) : null;
     await handleGrade(s?.suggestedGrade ?? 1);
-  }, [deck, index, practiceMode, sequence, userAnswer, handleGrade, advanceCard]);
+  }, [deck, index, practiceMode, sequence, isBb, userAnswer, handleGrade]);
 
   // Keep refs in sync for keyboard handler
   handleGradeRef.current = handleGrade;
@@ -911,7 +933,7 @@ export default function PracticeModePage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 sm:gap-6 sm:p-6">
           {loading ? (
             <LoadingSkeleton />
           ) : showConfig ? (
@@ -943,7 +965,6 @@ export default function PracticeModePage() {
                 setFlipped(true);
               }}
               onGrade={handleGrade}
-              onNext={handleNext}
               onBack={handleBack}
               onSkip={handleAutoNext}
               tr={tr}
@@ -974,7 +995,6 @@ function PracticeCard({
   onAnswerChange,
   onFlip,
   onGrade,
-  onNext,
   onBack,
   onSkip,
   tr,
@@ -995,22 +1015,27 @@ function PracticeCard({
   onAnswerChange: (v: string) => void;
   onFlip: () => void;
   onGrade: (g: Grade) => void;
-  onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
   tr: Tr;
 }) {
   const isInterval = item.type === 'interval';
   const isRootSelected = config?.type === 'root-selected';
+  const rootsBadge =
+    config?.type === 'root-selected'
+      ? (config.roots.length <= 3
+          ? config.roots.join(' ')
+          : `${config.roots[0]} +${config.roots.length - 1}`)
+      : null;
   return (
-    <div className="w-full max-w-2xl space-y-4">
+    <div className="w-full max-w-2xl space-y-4 px-1 sm:px-0">
       {/* Progress bar + badges */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="tabular-nums font-mono">{current} / {total}</span>
           {isRootSelected && config?.type === 'root-selected' && (
             <span className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
-              {config.root}
+              {rootsBadge}
             </span>
           )}
           {isCram && (
@@ -1055,7 +1080,7 @@ function PracticeCard({
 
       {/* Correct answer — only shown after reveal */}
       {flipped && (
-        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-3">
+        <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3 sm:p-6">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest text-center">
             {tr.correctAnswer}
           </p>
@@ -1077,13 +1102,7 @@ function PracticeCard({
               {gradeError}
             </p>
           )}
-          {isInterval ? (
-            <Button size="lg" onClick={onNext} className="w-full min-h-11">
-              {tr.nextBtn}
-            </Button>
-          ) : (
-            <GradeButtons onGrade={onGrade} loading={grading} suggested={score?.suggestedGrade} tr={tr} />
-          )}
+          <GradeButtons onGrade={onGrade} loading={grading} suggested={score?.suggestedGrade} tr={tr} />
         </>
       ) : (
         <Button size="lg" onClick={onFlip} className="w-full min-h-11">
@@ -1114,6 +1133,7 @@ function PracticeCard({
 
 function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c: PracticeConfig) => void; tr: Tr }) {
   const [sequenceCount, setSequenceCount] = useState(5);
+  const [selectedRoots, setSelectedRoots] = useState<Root[]>([]);
   const rootLabelMap: Record<PracticeMode, string> = {
     'full-scale': tr.rootLabelScale,
     'full-chord': tr.rootLabelChord,
@@ -1122,6 +1142,12 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
     'interval':   tr.rootLabelInterval,
   };
   const rootLabel = rootLabelMap[mode];
+
+  function toggleRoot(root: Root) {
+    setSelectedRoots((prev) => (
+      prev.includes(root) ? prev.filter((r) => r !== root) : [...prev, root]
+    ));
+  }
 
   return (
     <div className="w-full max-w-lg space-y-8">
@@ -1173,13 +1199,24 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
           {ROOTS.map((root) => (
             <button
               key={root}
-              onClick={() => onSelect({ type: 'root-selected', root, sequenceCount })}
-              className="rounded-lg border bg-card py-3 text-sm font-semibold transition-all hover:border-ring/50 hover:bg-accent hover:text-accent-foreground"
+              onClick={() => toggleRoot(root)}
+              className={cn(
+                'rounded-lg border bg-card py-3 text-sm font-semibold transition-all hover:border-ring/50 hover:bg-accent hover:text-accent-foreground',
+                selectedRoots.includes(root) && 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+              )}
             >
               {root}
             </button>
           ))}
         </div>
+        <Button
+          size="lg"
+          className="w-full min-h-11"
+          disabled={selectedRoots.length === 0}
+          onClick={() => onSelect({ type: 'root-selected', roots: selectedRoots, sequenceCount })}
+        >
+          {tr.modeStart}
+        </Button>
       </div>
     </div>
   );
@@ -1214,7 +1251,9 @@ function DoneScreen({
   tr: Tr;
 }) {
   const subtitle = config?.type === 'root-selected'
-    ? tr.doneRootSelected(total, config.root)
+    ? (config.roots.length === 1
+        ? tr.doneRootSelected(total, config.roots[0] ?? '')
+        : tr.doneRootsSelected(total, config.roots.join(' ')))
     : isCram
       ? tr.doneCram(total)
       : tr.doneFree(total);

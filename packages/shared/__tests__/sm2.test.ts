@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { nextSM2State, type CardSM2State } from '../src/theory/sm2.js';
 
 function makeCard(overrides: Partial<CardSM2State> = {}): CardSM2State {

@@ -5,10 +5,12 @@ import { useState, useEffect } from 'react';
 export type Lang = 'en' | 'zh';
 
 export function useLanguage() {
-  const [lang, setLang] = useState<Lang>('en');
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window === 'undefined') return 'en';
+    return (localStorage.getItem('lang') as Lang) ?? 'en';
+  });
 
   useEffect(() => {
-    setLang((localStorage.getItem('lang') as Lang) ?? 'en');
     const handler = () => setLang((localStorage.getItem('lang') as Lang) ?? 'en');
     window.addEventListener('language-change', handler);
     return () => window.removeEventListener('language-change', handler);

@@ -63,7 +63,7 @@ export default function PracticePage() {
           </Breadcrumb>
         </header>
 
-        <div className="flex flex-1 flex-col gap-6 p-6 pt-2">
+        <div className="flex flex-1 flex-col gap-6 p-4 pt-2 sm:p-6 sm:pt-2">
           <div>
             <h1 className="text-3xl">{tr.practiceTitle}</h1>
             <p className="text-muted-foreground">{tr.practiceSubtitle}</p>

@@ -10,8 +10,7 @@ The Shed is a jazz improvisation flashcard web app with SM-2 spaced repetition. 
 
 Turborepo + pnpm workspaces. Three packages:
 
-- `apps/web` — React + Vite frontend
-- `apps/api` — Node.js + Express/Fastify backend
+- `apps/web` — Next.js (App Router) frontend + API routes backend
 - `packages/shared` — zero-dependency theory logic and types consumed by both apps
 
 ## Commands
@@ -27,8 +26,7 @@ pnpm lint                 # lint all packages (turbo)
 # Target a single workspace
 pnpm --filter @the-shed/shared test
 pnpm --filter @the-shed/shared test -- --run TheoryMapper  # single test file
-pnpm --filter web dev
-pnpm --filter api dev
+pnpm --filter @the-shed/web dev
 ```
 
 ## UI: shadcn/ui + Tailwind CSS
@@ -71,7 +69,7 @@ A "C Major 251" is composed from three existing cards: `(dorian, D)`, `(mixolydi
 
 The frontend queries Supabase directly (via TanStack Query + anon key + user JWT) for card reads. The API handles: `POST /cards/:id/grade`, `POST /sessions`, `PATCH /sessions/:id`, `POST /cards/ensure`.
 
-API auth: JWT from the client session verified via `supabaseAdmin.auth.getUser(token)`. Service role is not used per-request so RLS remains the safety net.
+API auth: JWT from the client session verified via Supabase Auth. DB writes **must not bypass RLS**; API routes use the caller JWT so RLS remains the safety net.
 
 ### SM-2 formula
 

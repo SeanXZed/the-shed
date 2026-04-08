@@ -23,6 +23,7 @@ type TranslationMap = {
   grade3Label: string; grade3Desc: string; grade4Label: string; grade4Desc: string;
   doneTitle: string;
   doneRootSelected: (n: number, root: string) => string;
+  doneRootsSelected: (n: number, roots: string) => string;
   doneCram: (n: number) => string;
   doneFree: (n: number) => string;
   newSession: string; backToModes: string;
@@ -89,7 +90,7 @@ const en: TranslationMap = {
   configTitle:        'How do you want to practice?',
   configNoteCount:    'Notes per question',
   configRootFree:     'Root Free',
-  configRootFreeDesc: 'Random cards from your due queue — up to 50 per session.',
+  configRootFreeDesc: 'Random cards from your due queue — up to 20 per session.',
   configPickRoot:     'Or pick a root',
   rootLabel251:       'ii-V-I in this key',
   rootLabelInterval:  'all intervals from this root',
@@ -114,7 +115,7 @@ const en: TranslationMap = {
   nextCard:           'Next →',
   nextBtn:            'Next',
   hintReveal:         'Space to reveal · 1–4 to grade',
-  hintInterval:       'Space to reveal · Space to next',
+  hintInterval:       'Space to reveal · 1–4 to grade',
   cramBadge:          'Cram',
   suggested:          '★ suggested',
 
@@ -131,6 +132,7 @@ const en: TranslationMap = {
   // ── Done screen ──────────────────────────────────────────────────────────
   doneTitle:          'Done',
   doneRootSelected:   (n: number, root: string) => `${n} questions — root: ${root}`,
+  doneRootsSelected:  (n: number, roots: string) => `${n} questions — roots: ${roots}`,
   doneCram:           (n: number) => `Cranked through ${n} cards.`,
   doneFree:           (n: number) => `Reviewed ${n} due card${n !== 1 ? 's' : ''}.`,
   newSession:         'New Session',
@@ -215,7 +217,7 @@ const zh: TranslationMap = {
   configTitle:        '选择练习方式',
   configNoteCount:    '每题音符数',
   configRootFree:     '自由练习',
-  configRootFreeDesc: '从待复习卡片中随机抽取，每次最多 50 题。',
+  configRootFreeDesc: '从待复习卡片中随机抽取，每次最多 20 题。',
   configPickRoot:     '或选择根音',
   rootLabel251:       '在此调中练习 2-5-1',
   rootLabelInterval:  '从此根音练习所有音程',
@@ -240,7 +242,7 @@ const zh: TranslationMap = {
   nextCard:           '下一题 →',
   nextBtn:            '下一题',
   hintReveal:         '空格显示 · 1–4 评分',
-  hintInterval:       '空格显示 · 空格下一题',
+  hintInterval:       '空格显示 · 1–4 评分',
   cramBadge:          '强化',
   suggested:          '★ 推荐',
 
@@ -257,6 +259,7 @@ const zh: TranslationMap = {
   // ── Done screen ──────────────────────────────────────────────────────────
   doneTitle:          '完成',
   doneRootSelected:   (n: number, root: string) => `共 ${n} 题 — 根音：${root}`,
+  doneRootsSelected:  (n: number, roots: string) => `共 ${n} 题 — 根音：${roots}`,
   doneCram:           (n: number) => `强化练习了 ${n} 张卡片。`,
   doneFree:           (n: number) => `复习了 ${n} 张待复习卡片。`,
   newSession:         '新练习',
