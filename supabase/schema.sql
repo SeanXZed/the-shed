@@ -1,20 +1,31 @@
--- Supabase schema for The Shed (Foundation phase)
--- Apply this to a fresh Supabase project via the SQL editor.
--- All tables are created from scratch; no migration assumed.
+-- The Shed — full schema (drop + recreate)
+-- Run this in the Supabase SQL editor to reset the database from scratch.
+-- WARNING: drops all existing data.
 
 -- ============================================================
--- FLASHCARD CARDS (SM-2 state per user per scale)
+-- TEARDOWN (reverse dependency order)
 -- ============================================================
 
-create table if not exists public.cards (
-  id               uuid        primary key default gen_random_uuid(),
-  user_id          uuid        not null references auth.users(id) on delete cascade,
-  scale_type       text        not null,
-  root             text        not null,
+drop trigger  if exists on_auth_user_created   on auth.users;
+drop function if exists public.ensure_user_cards();
+
+drop table if exists public.practice_events  cascade;
+drop table if exists public.practice_sessions cascade;
+drop table if exists public.cards             cascade;
+
+-- ============================================================
+-- CARDS (SM-2 state per user per scale)
+-- ============================================================
+
+create table public.cards (
+  id               uuid             primary key default gen_random_uuid(),
+  user_id          uuid             not null references auth.users(id) on delete cascade,
+  scale_type       text             not null,
+  root             text             not null,
   ease_factor      double precision not null default 2.5,
-  interval_days    integer     not null default 1,
-  next_review      timestamptz not null default now(),
-  repetitions      integer     not null default 0,
+  interval_days    integer          not null default 1,
+  next_review      timestamptz      not null default now(),
+  repetitions      integer          not null default 0,
   last_reviewed_at timestamptz,
 
   constraint cards_user_scale_root_unique
@@ -31,58 +42,60 @@ create table if not exists public.cards (
     'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F'
   )),
 
-  constraint cards_ease_factor_min check (ease_factor >= 1.3),
+  constraint cards_ease_factor_min  check (ease_factor >= 1.3),
   constraint cards_interval_days_min check (interval_days >= 1),
-  constraint cards_repetitions_min check (repetitions >= 0)
+  constraint cards_repetitions_min  check (repetitions >= 0)
 );
 
 -- Critical for the due-card query: next_review <= now() per user
-create index cards_user_next_review_idx
-  on public.cards (user_id, next_review);
+create index cards_user_next_review_idx on public.cards (user_id, next_review);
 
 -- ============================================================
--- PRACTICE SESSIONS (one row per session start/end)
+-- PRACTICE SESSIONS (one row per session)
 -- ============================================================
 
-create table if not exists public.practice_sessions (
-  id            uuid        primary key default gen_random_uuid(),
-  user_id       uuid        not null references auth.users(id) on delete cascade,
-  started_at    timestamptz not null default now(),
-  ended_at      timestamptz,
-  practice_mode text        not null,
-  is_cram       boolean     not null default false,
+create table public.practice_sessions (
+  id             uuid        primary key default gen_random_uuid(),
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  started_at     timestamptz not null default now(),
+  ended_at       timestamptz,
+  practice_mode  text        not null,
+  root           text,        -- null = root-free mode
+  sequence_count integer,     -- only set for sequence mode (3–7)
+  is_cram        boolean     not null default false,
+  cards_reviewed integer     not null default 0,
+  correct_count  integer     not null default 0,   -- grade >= 3
 
   constraint practice_sessions_mode_valid check (practice_mode in (
-    'full_scale', 'full_chord', 'sequence', '251'
+    'full_scale', 'full_chord', 'sequence', '251', 'interval'
   ))
 );
 
 -- ============================================================
--- PRACTICE EVENTS (per-card events within a session)
+-- PRACTICE EVENTS (one row per card graded within a session)
 -- ============================================================
 
-create table if not exists public.practice_events (
+create table public.practice_events (
   id            uuid        primary key default gen_random_uuid(),
   user_id       uuid        not null references auth.users(id) on delete cascade,
   session_id    uuid        references public.practice_sessions(id) on delete cascade,
   occurred_at   timestamptz not null default now(),
-  event_type    text        not null,
-  practice_mode text,
+  practice_mode text        not null,
   root          text,
   scale_type    text,
-  chord_name    text,
-  grade         integer,
+  grade         integer     not null,
+  is_correct    boolean     not null,   -- grade >= 3
 
-  constraint practice_events_grade_valid check (grade is null or grade between 1 and 4)
+  constraint practice_events_grade_valid check (grade between 1 and 4)
 );
 
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 
-alter table public.cards enable row level security;
-alter table public.practice_sessions enable row level security;
-alter table public.practice_events enable row level security;
+alter table public.cards              enable row level security;
+alter table public.practice_sessions  enable row level security;
+alter table public.practice_events    enable row level security;
 
 -- cards
 create policy "cards_select_own" on public.cards
@@ -115,10 +128,7 @@ create policy "practice_events_delete_own" on public.practice_events
   for delete using (auth.uid() = user_id);
 
 -- ============================================================
--- SEEDING: 204 CARDS PER USER ON SIGN-UP
--- Creates one card row for every (scale_type, root) combination
--- (17 scales × 12 roots = 204 cards) when a new auth user is created.
--- The on conflict clause makes this idempotent.
+-- TRIGGER: seed 204 cards (17 scales × 12 roots) on user sign-up
 -- ============================================================
 
 create or replace function public.ensure_user_cards()

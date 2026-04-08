@@ -1,4 +1,4 @@
-export type ChordQuality = 'maj7' | 'min7' | 'dom7' | 'min7b5' | 'minmaj7';
+export type ChordQuality = 'maj7' | 'min7' | 'dom7' | 'min7b5' | 'minmaj7' | 'dim7';
 
 export interface ScaleDefinition {
   id: string;

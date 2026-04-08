@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { getUserId } from '@/lib/supabase/server';
+import { getUserId, getSupabaseAdmin } from '@/lib/supabase/server';
 
 const endSessionSchema = z.object({
   ended_at: z.string().datetime(),
+  cards_reviewed: z.number().int().min(0).optional(),
+  correct_count: z.number().int().min(0).optional(),
 });
 
 export async function PATCH(
@@ -20,16 +21,12 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const token = request.headers.get('authorization')!.replace('Bearer ', '');
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } },
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = getSupabaseAdmin() as any;
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('practice_sessions')
-    .update({ ended_at: parsed.data.ended_at })
+    .update(parsed.data)
     .eq('id', id)
     .eq('user_id', userId)
     .select()

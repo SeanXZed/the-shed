@@ -1,8 +1,8 @@
-export type { Root } from '../constants/roots.js';
-export type { ChordQuality, ScaleDefinition } from '../constants/scaleDefinitions.js';
-export type { ScaleData } from '../theory/TheoryMapper.js';
-export type { CardSM2State } from '../theory/sm2.js';
-export type { TwoFiveOne, TwoFiveOneChord } from '../theory/twoFiveOne.js';
+export type { Root } from '../constants/roots';
+export type { ChordQuality, ScaleDefinition } from '../constants/scaleDefinitions';
+export type { ScaleData } from '../theory/TheoryMapper';
+export type { CardSM2State } from '../theory/sm2';
+export type { TwoFiveOne, TwoFiveOneChord } from '../theory/twoFiveOne';
 
 export type PracticeMode = 'full_scale' | 'full_chord' | 'sequence' | '251';
 

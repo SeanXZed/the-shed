@@ -1,12 +1,12 @@
-import type { Root } from '../constants/roots.js';
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic.js';
-import { getScaleDefinition } from '../constants/scaleDefinitions.js';
-import { transposeNotes, BB_OFFSET } from './transpose.js';
+import type { Root } from '../constants/roots';
+import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
+import { getScaleDefinition } from '../constants/scaleDefinitions';
+import { transposeNotes, BB_OFFSET } from './transpose';
 import {
   getChordTones,
   getChordSymbol,
   CHORD_TONE_DEGREES,
-} from './chordTones.js';
+} from './chordTones';
 
 export interface ScaleData {
   scaleId: string;

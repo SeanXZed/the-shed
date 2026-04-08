@@ -1,5 +1,5 @@
-import type { ChordQuality } from '../constants/scaleDefinitions.js';
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic.js';
+import type { ChordQuality } from '../constants/scaleDefinitions';
+import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
 
 // Semitone offsets from root for each chord quality.
 export const CHORD_TONE_INTERVALS: Record<ChordQuality, readonly number[]> = {
@@ -8,6 +8,7 @@ export const CHORD_TONE_INTERVALS: Record<ChordQuality, readonly number[]> = {
   dom7:    [0, 4, 7, 10],
   min7b5:  [0, 3, 6, 10],
   minmaj7: [0, 3, 7, 11],
+  dim7:    [0, 3, 6, 9],
 };
 
 export const CHORD_TONE_DEGREES: Record<ChordQuality, readonly string[]> = {
@@ -16,6 +17,7 @@ export const CHORD_TONE_DEGREES: Record<ChordQuality, readonly string[]> = {
   dom7:    ['1', '3', '5', 'b7'],
   min7b5:  ['1', 'b3', 'b5', 'b7'],
   minmaj7: ['1', 'b3', '5', '7'],
+  dim7:    ['1', 'b3', 'b5', 'bb7'],
 };
 
 // Chord symbol suffix appended to the root name.
@@ -25,6 +27,7 @@ export const CHORD_SUFFIX: Record<ChordQuality, string> = {
   dom7:    '7',
   min7b5:  '-7b5',
   minmaj7: '-7(∆)',
+  dim7:    '°7',
 };
 
 export function getChordTones(root: string, quality: ChordQuality): string[] {

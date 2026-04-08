@@ -1,4 +1,4 @@
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic.js';
+import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
 
 export const BB_OFFSET = 2; // Concert → Bb: written pitch is 2 semitones higher
 

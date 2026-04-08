@@ -1,6 +1,6 @@
-import type { Root } from '../constants/roots.js';
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic.js';
-import { isRoot } from '../constants/roots.js';
+import type { Root } from '../constants/roots';
+import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
+import { isRoot } from '../constants/roots';
 
 export interface TwoFiveOneChord {
   scaleType: string;
