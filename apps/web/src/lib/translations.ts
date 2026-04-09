@@ -17,7 +17,10 @@ type TranslationMap = {
   labelScale: string; labelChordTones: string; labelSequence: string; label251: string; labelInterval: string;
   whatDegrees: string; nameChordTones: string; nameTarget: string;
   revealAnswer: string; correctAnswer: string; yourAnswer: string; noAnswer: string;
-  prevCard: string; nextCard: string; finishPractice: string; nextBtn: string; hintReveal: string; hintInterval: string;
+  prevCard: string; nextCard: string; finishPractice: string; nextBtn: string;   hintReveal: string; hintInterval: string;
+  playAudio: string;
+  chordPlaybackBlock: string;
+  chordPlaybackArpeggio: string;
   cramBadge: string;
   grade1Label: string; grade1Desc: string; grade2Label: string; grade2Desc: string;
   grade3Label: string; grade3Desc: string; grade4Label: string; grade4Desc: string;
@@ -118,6 +121,9 @@ const en: TranslationMap = {
   nextBtn:            'Next',
   hintReveal:         'Space to reveal · 1–4 to grade',
   hintInterval:       'Space to reveal · 1–4 to grade',
+  playAudio:          'Play',
+  chordPlaybackBlock: 'Block',
+  chordPlaybackArpeggio: 'Up–Down',
   cramBadge:          'Cram',
 
   // ── Grades ───────────────────────────────────────────────────────────────
@@ -246,6 +252,9 @@ const zh: TranslationMap = {
   nextBtn:            '下一题',
   hintReveal:         '空格显示 · 1–4 评分',
   hintInterval:       '空格显示 · 1–4 评分',
+  playAudio:          '播放',
+  chordPlaybackBlock: '柱式',
+  chordPlaybackArpeggio: '上下行',
   cramBadge:          '强化',
 
   // ── Grades ───────────────────────────────────────────────────────────────

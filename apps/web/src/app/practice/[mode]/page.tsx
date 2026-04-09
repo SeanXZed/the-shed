@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Volume2 } from 'lucide-react';
 import {
   getScaleData,
   get251,
@@ -37,6 +38,20 @@ import {
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import {
+  type DeckItem,
+  type IntervalItem,
+  type PracticeMode,
+  type StandardItem,
+  type TwoFiveOneItem,
+  getExpectedNotes,
+} from '@/lib/practiceExpectedNotes';
+import {
+  type ChordPlayMode,
+  getChordPlayMode,
+  setChordPlayMode,
+  playPracticeItem,
+} from '@/lib/tonePlayback';
 
 type Tr = ReturnType<typeof t>;
 
@@ -67,36 +82,9 @@ const INTERVALS = [
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type PracticeMode = 'full-scale' | 'full-chord' | 'sequence' | '251' | 'interval';
-
 type PracticeConfig =
   | { type: 'root-free';      sequenceCount: number }
   | { type: 'root-selected';  roots: Root[]; sequenceCount: number };
-
-interface StandardItem {
-  type: 'standard';
-  card: Card;
-}
-
-interface TwoFiveOneItem {
-  type: '251';
-  key: Root;
-  tonality: 'major' | 'minor';
-  combo: TwoFiveOne;
-  cards: { ii: Card; V: Card; I: Card };
-}
-
-interface IntervalItem {
-  type: 'interval';
-  root: Root;
-  intervalId: string;
-  intervalName: string;
-  semitones: number;
-  direction: 'up' | 'down';
-  answer: string;
-}
-
-type DeckItem = StandardItem | TwoFiveOneItem | IntervalItem;
 
 const MODE_LABELS: Record<PracticeMode, string> = {
   'full-scale': 'Full Scale',
@@ -239,37 +227,6 @@ function parseNotes(input: string): string[] {
     .split(/[\s,/|+\n]+/)
     .map(canonicalNote)
     .filter(n => n.length > 0);
-}
-
-function getExpectedNotes(
-  item: DeckItem,
-  mode: PracticeMode,
-  sequence: string[],
-  isBb: boolean,
-): string[] {
-  if (item.type === 'interval') {
-    const answer = isBb ? transposeNote(item.answer, 2) : item.answer;
-    return [answer];
-  }
-
-  if (item.type === 'standard') {
-    const data = getScaleData(item.card.root as Root, item.card.scale_type);
-    const notes = isBb ? data.trumpetNotes : data.concertNotes;
-    if (mode === 'full-scale') return [...notes];
-    if (mode === 'full-chord') return [...(isBb ? data.trumpetChordTones : data.concertChordTones)];
-    // sequence — map selected degrees to notes
-    const degreeToNote = Object.fromEntries(data.scaleDegrees.map((d, i) => [d, notes[i] ?? '?']));
-    return sequence.map(d => degreeToNote[d] ?? '?');
-  }
-  // 251 — union of chord tones across ii, V, I
-  const seen = new Set<string>();
-  const all: string[] = [];
-  for (const { root, scaleType } of [item.combo.ii, item.combo.V, item.combo.I]) {
-    const data = getScaleData(root, scaleType);
-    const tones = isBb ? data.trumpetChordTones : data.concertChordTones;
-    tones.forEach(t => { if (!seen.has(t)) { seen.add(t); all.push(t); } });
-  }
-  return all;
 }
 
 function scoreAnswer(userInput: string, expectedNotes: string[]): AnswerScore {
@@ -660,6 +617,8 @@ export default function PracticeModePage() {
   const [userAnswer, setUserAnswer] = useState('');
   const [score, setScore] = useState<AnswerScore | null>(null);
   const [gradeError, setGradeError] = useState<string | null>(null);
+  const [chordPlayMode, setChordPlayModeState] = useState<ChordPlayMode>(() => getChordPlayMode());
+  const [playing, setPlaying] = useState(false);
 
   const { isBb, toggle: toggleBb } = useBb();
   const { lang } = useLanguage();
@@ -875,6 +834,24 @@ export default function PracticeModePage() {
     await handleGrade(s?.suggestedGrade ?? 1);
   }, [deck, index, practiceMode, sequence, isBb, userAnswer, handleGrade]);
 
+  const handleChordPlayModeChange = useCallback((m: ChordPlayMode) => {
+    setChordPlayModeState(m);
+    setChordPlayMode(m);
+  }, []);
+
+  const handlePlay = useCallback(async () => {
+    const item = deck[index];
+    if (!item) return;
+    setPlaying(true);
+    try {
+      await playPracticeItem(item, practiceMode, sequence, chordPlayMode);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPlaying(false);
+    }
+  }, [deck, index, practiceMode, sequence, chordPlayMode]);
+
   // Keep refs in sync for keyboard handler
   handleGradeRef.current = handleGrade;
   handleNextRef.current = handleNext;
@@ -965,6 +942,10 @@ export default function PracticeModePage() {
               onGrade={handleGrade}
               onBack={handleBack}
               onSkip={handleAutoNext}
+              chordPlayMode={chordPlayMode}
+              onChordPlayModeChange={handleChordPlayModeChange}
+              onPlay={handlePlay}
+              playing={playing}
               tr={tr}
             />
           )}
@@ -995,6 +976,10 @@ function PracticeCard({
   onGrade,
   onBack,
   onSkip,
+  chordPlayMode,
+  onChordPlayModeChange,
+  onPlay,
+  playing,
   tr,
 }: {
   item: DeckItem;
@@ -1015,9 +1000,14 @@ function PracticeCard({
   onGrade: (g: Grade) => void;
   onBack: () => void;
   onSkip: () => void;
+  chordPlayMode: ChordPlayMode;
+  onChordPlayModeChange: (m: ChordPlayMode) => void;
+  onPlay: () => void;
+  playing: boolean;
   tr: Tr;
 }) {
   const isInterval = item.type === 'interval';
+  const showChordPlayback = mode === 'full-chord' || mode === '251';
   const isRootSelected = config?.type === 'root-selected';
   const rootsBadge =
     config?.type === 'root-selected'
@@ -1040,10 +1030,54 @@ function PracticeCard({
             <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs">{tr.cramBadge}</span>
           )}
         </div>
-        {!flipped && (
-          <span className="text-xs opacity-60">
-            {isInterval ? tr.hintInterval : tr.hintReveal}
-          </span>
+        <div className="flex items-center gap-2">
+          {!flipped && (
+            <span className="text-xs opacity-60">
+              {isInterval ? tr.hintInterval : tr.hintReveal}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="min-h-9 gap-1.5"
+          onClick={onPlay}
+          disabled={playing || grading}
+        >
+          <Volume2 className="size-4 shrink-0" aria-hidden />
+          {tr.playAudio}
+        </Button>
+        {showChordPlayback && (
+          <div className="flex rounded-md border border-border p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => onChordPlayModeChange('block')}
+              className={cn(
+                'rounded px-2.5 py-1.5 transition-colors',
+                chordPlayMode === 'block'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {tr.chordPlaybackBlock}
+            </button>
+            <button
+              type="button"
+              onClick={() => onChordPlayModeChange('arpeggio')}
+              className={cn(
+                'rounded px-2.5 py-1.5 transition-colors',
+                chordPlayMode === 'arpeggio'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {tr.chordPlaybackArpeggio}
+            </button>
+          </div>
         )}
       </div>
 
