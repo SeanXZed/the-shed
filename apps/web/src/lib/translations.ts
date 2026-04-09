@@ -6,7 +6,7 @@ type TranslationMap = {
   welcomeBack: string; welcomeSub: string;
   statDueToday: string; statDueSub: string; statStreak: string; statStreakSub: string;
   statMastered: string; statMasteredSub: string; statModes: string; statModesSub: string;
-  startPractice: string; browseScales: string; yourLibrary: string; libraryDesc: string;
+  startPractice: string; browseScales: string; browseChords: string; yourLibrary: string; libraryDesc: string;
   practiceTitle: string; practiceSubtitle: string; modeStart: string;
   modeFullScale: string; modeFullScaleDesc: string; modeFullChord: string; modeFullChordDesc: string;
   modeSequence: string; modeSequenceDesc: string; mode251: string; mode251Desc: string;
@@ -17,7 +17,7 @@ type TranslationMap = {
   labelScale: string; labelChordTones: string; labelSequence: string; label251: string; labelInterval: string;
   whatDegrees: string; nameChordTones: string; nameTarget: string;
   revealAnswer: string; correctAnswer: string; yourAnswer: string; noAnswer: string;
-  prevCard: string; nextCard: string; nextBtn: string; hintReveal: string; hintInterval: string;
+  prevCard: string; nextCard: string; finishPractice: string; nextBtn: string; hintReveal: string; hintInterval: string;
   cramBadge: string;
   grade1Label: string; grade1Desc: string; grade2Label: string; grade2Desc: string;
   grade3Label: string; grade3Desc: string; grade4Label: string; grade4Desc: string;
@@ -68,6 +68,7 @@ const en: TranslationMap = {
   statModesSub:       'Scale · Chord · Seq · 251',
   startPractice:      'Start Practice',
   browseScales:       'Browse Scales',
+  browseChords:       'Browse Chords',
   yourLibrary:        'Your Library',
   libraryDesc:        '204 cards — 17 scale types × 12 roots, across five practice modes. Cards are reviewed using SM-2 spaced repetition so you spend more time on what needs work.',
 
@@ -113,6 +114,7 @@ const en: TranslationMap = {
   noAnswer:           'No answer given',
   prevCard:           '← Prev',
   nextCard:           'Next →',
+  finishPractice:     'Finish',
   nextBtn:            'Next',
   hintReveal:         'Space to reveal · 1–4 to grade',
   hintInterval:       'Space to reveal · 1–4 to grade',
@@ -194,6 +196,7 @@ const zh: TranslationMap = {
   statModesSub:       '音阶 · 和弦 · 序列 · 2-5-1',
   startPractice:      '开始练习',
   browseScales:       '查看音阶',
+  browseChords:       '查看和弦',
   yourLibrary:        '我的卡库',
   libraryDesc:        '204 张卡片 — 17 种音阶 × 12 个根音，涵盖五种练习模式。使用 SM-2 间隔重复算法，把时间花在最需要巩固的内容上。',
 
@@ -239,6 +242,7 @@ const zh: TranslationMap = {
   noAnswer:           '未作答',
   prevCard:           '← 上一题',
   nextCard:           '下一题 →',
+  finishPractice:     '完成',
   nextBtn:            '下一题',
   hintReveal:         '空格显示 · 1–4 评分',
   hintInterval:       '空格显示 · 1–4 评分',

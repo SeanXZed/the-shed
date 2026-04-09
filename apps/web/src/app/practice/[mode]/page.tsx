@@ -730,7 +730,7 @@ export default function PracticeModePage() {
         body: JSON.stringify({
           practice_mode: dbMode,
           is_cram: isCram,
-          root: config.type === 'root-selected' && config.roots.length === 1 ? config.roots[0] : null,
+          root: config.type === 'root-selected' ? config.roots.join(',') : null,
           sequence_count: practiceMode === 'sequence' ? config.sequenceCount : null,
         }),
       });
@@ -1118,11 +1118,12 @@ function PracticeCard({
           {tr.prevCard}
         </button>
         <button
+          type="button"
           onClick={onSkip}
-          disabled={current === total}
+          disabled={grading}
           className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
         >
-          {tr.nextCard}
+          {current === total ? tr.finishPractice : tr.nextCard}
         </button>
       </div>
     </div>

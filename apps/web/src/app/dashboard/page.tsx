@@ -131,6 +131,9 @@ export default function DashboardPage() {
             <Link href="/scales" className={buttonVariants({ variant: "outline" })}>
               {tr.browseScales}
             </Link>
+            <Link href="/chords" className={buttonVariants({ variant: "outline" })}>
+              {tr.browseChords}
+            </Link>
           </div>
 
           {/* Scale grid info */}

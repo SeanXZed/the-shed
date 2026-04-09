@@ -60,9 +60,9 @@ create table public.practice_sessions (
   started_at     timestamptz not null default now(),
   ended_at       timestamptz,
   practice_mode  text        not null,
-  root           text,        -- null = root-free mode
+  root           text,        -- null = root-free; single root e.g. 'C'; multiple roots comma-separated e.g. 'C,G,D'
   sequence_count integer,     -- only set for sequence mode (3–7)
-  is_cram        boolean     not null default false,
+  is_cram        boolean     not null default false,  -- true when practicing from full deck (no due cards); false = due-queue session
   cards_reviewed integer     not null default 0,
   correct_count  integer     not null default 0,   -- grade >= 3
 

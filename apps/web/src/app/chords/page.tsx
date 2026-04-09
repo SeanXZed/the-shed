@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { useAllCards } from '@/hooks/use-cards';
 import { useBb } from '@/hooks/use-bb';
 import { useLanguage } from '@/hooks/use-language';
 import { t } from '@/lib/translations';
@@ -32,10 +31,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-
-type Tr = ReturnType<typeof t>;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,39 +47,12 @@ const QUALITY_SCALES: Record<ChordQuality, string[]> = {
   minmaj7: ['Melodic Minor', 'Harmonic Minor'],
 };
 
-// Representative scale per quality for SM-2 lookup (null = no direct card)
-const QUALITY_REP_SCALE: Record<ChordQuality, string | null> = {
-  maj7:    'major',
-  min7:    'dorian',
-  dom7:    'mixolydian',
-  min7b5:  'locrian',
-  dim7:    null,
-  minmaj7: 'melodic_minor',
-};
-
-function qualityLabel(q: ChordQuality, tr: Tr): string {
+function qualityLabel(q: ChordQuality, tr: ReturnType<typeof t>): string {
   const map: Record<ChordQuality, string> = {
     maj7: tr.qualityMaj7, min7: tr.qualityMin7, dom7: tr.qualityDom7,
     min7b5: tr.qualityMin7b5, dim7: tr.qualityDim7, minmaj7: tr.qualityMinmaj7,
   };
   return map[q];
-}
-
-function relativeTime(dateStr: string, tr: Tr): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  const days = Math.ceil(diff / 86_400_000);
-  if (days < 0) return tr.timeOverdue;
-  if (days === 0) return tr.timeToday;
-  if (days === 1) return tr.timeTomorrow;
-  return tr.timeInDays(days);
-}
-
-function relativeClass(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  const days = Math.ceil(diff / 86_400_000);
-  if (days < 0) return 'text-rose-500';
-  if (days === 0) return 'text-amber-500';
-  return 'text-muted-foreground';
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -97,21 +66,12 @@ export default function ChordsPage() {
   const { lang } = useLanguage();
   const tr = t(lang);
 
-  const { data: cards, isLoading } = useAllCards();
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/login');
       else setAuthed(true);
     });
   }, [router]);
-
-  // Card lookup: scale_type:root → card
-  const cardMap = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof cards>[number]>();
-    cards?.forEach(c => map.set(`${c.scale_type}:${c.root}`, c));
-    return map;
-  }, [cards]);
 
   const rows = useMemo(() =>
     CHORD_QUALITIES
@@ -122,13 +82,10 @@ export default function ChordsPage() {
           .map(root => {
             const tones = getChordTones(root, quality);
             const degrees = CHORD_TONE_DEGREES[quality];
-            const symbol = `${root}${CHORD_SUFFIX[quality]}`;
-            const repScale = QUALITY_REP_SCALE[quality];
-            const card = repScale ? cardMap.get(`${repScale}:${root}`) : undefined;
-            return { quality, root, symbol, tones, degrees, card };
+            return { quality, root, tones, degrees };
           }),
       ),
-  [qualityFilter, rootFilter, cardMap]);
+  [qualityFilter, rootFilter]);
 
   if (!authed) return null;
 
@@ -208,14 +165,7 @@ export default function ChordsPage() {
           </div>
 
           {/* Table */}
-          {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full rounded-md" />
-              ))}
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/40">
                   <tr>
@@ -223,12 +173,10 @@ export default function ChordsPage() {
                     <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">{tr.colQuality}</th>
                     <th className="px-4 py-2 text-left font-medium text-muted-foreground">{tr.colTonesDegrees}</th>
                     <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden lg:table-cell">{tr.colUsedBy}</th>
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">{tr.colNextReview}</th>
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">{tr.colReps}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ quality, root, tones, degrees, card }) => {
+                  {rows.map(({ quality, root, tones, degrees }) => {
                     const displayRoot = isBb ? transposeNote(root, BB_OFFSET) : root;
                     const displayTones = isBb ? transposeNotes(tones, BB_OFFSET) : tones;
                     const displaySymbol = `${displayRoot}${CHORD_SUFFIX[quality]}`;
@@ -248,17 +196,6 @@ export default function ChordsPage() {
                         <td className="px-4 py-2 hidden lg:table-cell text-xs text-muted-foreground">
                           {QUALITY_SCALES[quality].join(', ')}
                         </td>
-                        <td
-                          className={cn(
-                            'px-4 py-2 hidden md:table-cell tabular-nums text-xs',
-                            card ? relativeClass(card.next_review) : 'text-muted-foreground',
-                          )}
-                        >
-                          {card ? relativeTime(card.next_review, tr) : '—'}
-                        </td>
-                        <td className="px-4 py-2 hidden md:table-cell text-muted-foreground tabular-nums text-xs">
-                          {card ? card.repetitions : '—'}
-                        </td>
                       </tr>
                     );
                   })}
@@ -268,7 +205,6 @@ export default function ChordsPage() {
                 <p className="py-8 text-center text-sm text-muted-foreground">{tr.noChordsMatch}</p>
               )}
             </div>
-          )}
         </div>
       </SidebarInset>
     </SidebarProvider>
