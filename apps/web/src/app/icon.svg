@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Beamed eighth notes">
+  <g fill="#18181b">
+    <!-- Beam -->
+    <path d="M10.5 5h14v3.6h-14z"/>
+    <!-- Stems (up) -->
+    <rect x="12.8" y="8.2" width="2.1" height="14.8" rx="0.45"/>
+    <rect x="23.8" y="8.2" width="2.1" height="14.8" rx="0.45"/>
+    <!-- Note heads -->
+    <ellipse cx="8" cy="25" rx="5.4" ry="3.7" transform="rotate(-26 8 25)"/>
+    <ellipse cx="18.8" cy="25" rx="5.4" ry="3.7" transform="rotate(-26 18.8 25)"/>
+  </g>
+</svg>

@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
+import { useLanguage } from "@/hooks/use-language"
+import { t } from "@/lib/translations"
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const tr = t(lang)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
@@ -24,11 +28,11 @@ export function SignupForm({
     e.preventDefault()
     setError(null)
     if (password !== confirm) {
-      setError("Passwords do not match.")
+      setError(tr.authPasswordMismatch)
       return
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.")
+      setError(tr.authPasswordMinLength)
       return
     }
     setLoading(true)
@@ -48,11 +52,13 @@ export function SignupForm({
   if (done) {
     return (
       <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-2xl">Check your email</h1>
+        <h1 className="text-2xl">{tr.authCheckEmailTitle}</h1>
         <p className="text-sm text-muted-foreground">
-          We sent a confirmation link to <strong>{email}</strong>.
-          Click it to activate your account, then{" "}
-          <a href="/login" className="underline underline-offset-4 hover:text-primary">sign in</a>.
+          {tr.authCheckEmailPart1} <strong>{email}</strong>. {tr.authCheckEmailPart2}{" "}
+          <a href="/login" className="underline underline-offset-4 hover:text-primary">
+            {tr.authSignInInline}
+          </a>
+          .
         </p>
       </div>
     )
@@ -61,19 +67,19 @@ export function SignupForm({
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
       <div className="flex flex-col items-center gap-1 text-center">
-        <h1 className="text-2xl">Create your account</h1>
+        <h1 className="text-2xl">{tr.authSignupTitle}</h1>
         <p className="text-sm text-balance text-muted-foreground">
-          Fill in the form below to get started
+          {tr.authSignupSubtitle}
         </p>
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{tr.authEmail}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="m@example.com"
+            placeholder={tr.authEmailPlaceholder}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -81,11 +87,11 @@ export function SignupForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{tr.authPassword}</Label>
           <Input
             id="password"
             type="password"
-            placeholder="At least 8 characters"
+            placeholder={tr.authPasswordHintPlaceholder}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -93,7 +99,7 @@ export function SignupForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="confirm-password">Confirm Password</Label>
+          <Label htmlFor="confirm-password">{tr.authConfirmPassword}</Label>
           <Input
             id="confirm-password"
             type="password"
@@ -108,13 +114,13 @@ export function SignupForm({
         )}
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Creating account…" : "Create Account"}
+          {loading ? tr.authCreatingAccount : tr.authCreateAccountButton}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
+          {tr.authHaveAccount}{" "}
           <a href="/login" className="underline underline-offset-4 hover:text-primary">
-            Sign in
+            {tr.authSignInLink}
           </a>
         </p>
       </div>

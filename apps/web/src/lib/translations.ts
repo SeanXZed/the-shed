@@ -3,6 +3,32 @@ import type { Lang } from '@/hooks/use-language';
 type TranslationMap = {
   appSubtitle: string; navDashboard: string; navPractice: string; navScales: string;
   navChords: string; signOut: string;
+
+  authLoginTitle: string;
+  authLoginSubtitle: string;
+  authEmail: string;
+  authPassword: string;
+  authEmailPlaceholder: string;
+  authSigningIn: string;
+  authLoginButton: string;
+  authNoAccount: string;
+  authSignUpLink: string;
+  authSignupTitle: string;
+  authSignupSubtitle: string;
+  authConfirmPassword: string;
+  authPasswordHintPlaceholder: string;
+  authCreatingAccount: string;
+  authCreateAccountButton: string;
+  authHaveAccount: string;
+  authSignInLink: string;
+  authCheckEmailTitle: string;
+  authCheckEmailPart1: string;
+  authCheckEmailPart2: string;
+  authSignInInline: string;
+  authPasswordMismatch: string;
+  authPasswordMinLength: string;
+  authImageAlt: string;
+
   welcomeBack: string; welcomeSub: string;
   statDueToday: string; statDueSub: string; statStreak: string; statStreakSub: string;
   statMastered: string; statMasteredSub: string; statModes: string; statModesSub: string;
@@ -57,6 +83,31 @@ const en: TranslationMap = {
   navScales:          'Scales',
   navChords:          'Chords',
   signOut:            'Sign out',
+
+  authLoginTitle:        'Login to your account',
+  authLoginSubtitle:     'Enter your email below to sign in.',
+  authEmail:             'Email',
+  authPassword:          'Password',
+  authEmailPlaceholder:  'm@example.com',
+  authSigningIn:         'Signing in…',
+  authLoginButton:       'Login',
+  authNoAccount:         'Don’t have an account?',
+  authSignUpLink:        'Sign up',
+  authSignupTitle:       'Create your account',
+  authSignupSubtitle:    'Fill in the form below to get started.',
+  authConfirmPassword:   'Confirm password',
+  authPasswordHintPlaceholder: 'At least 8 characters',
+  authCreatingAccount:   'Creating account…',
+  authCreateAccountButton: 'Create account',
+  authHaveAccount:       'Already have an account?',
+  authSignInLink:        'Sign in',
+  authCheckEmailTitle:   'Check your email',
+  authCheckEmailPart1:   'We sent a confirmation link to',
+  authCheckEmailPart2:   'Click it to activate your account, then',
+  authSignInInline:      'sign in',
+  authPasswordMismatch:  'Passwords do not match.',
+  authPasswordMinLength: 'Password must be at least 8 characters.',
+  authImageAlt:          'Jazz musician',
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        'Welcome back',
@@ -188,6 +239,31 @@ const zh: TranslationMap = {
   navScales:          '音阶',
   navChords:          '和弦',
   signOut:            '退出登录',
+
+  authLoginTitle:        '登录账号',
+  authLoginSubtitle:     '在下方输入邮箱和密码。',
+  authEmail:             '邮箱',
+  authPassword:          '密码',
+  authEmailPlaceholder:  'you@example.com',
+  authSigningIn:         '登录中…',
+  authLoginButton:       '登录',
+  authNoAccount:         '还没有账号？',
+  authSignUpLink:        '注册',
+  authSignupTitle:       '创建账号',
+  authSignupSubtitle:    '填写以下信息开始使用。',
+  authConfirmPassword:   '确认密码',
+  authPasswordHintPlaceholder: '至少 8 个字符',
+  authCreatingAccount:   '创建中…',
+  authCreateAccountButton: '创建账号',
+  authHaveAccount:       '已有账号？',
+  authSignInLink:        '登录',
+  authCheckEmailTitle:   '请查收邮件',
+  authCheckEmailPart1:   '我们已将确认链接发送至',
+  authCheckEmailPart2:   '请点击邮件中的链接激活账号，然后',
+  authSignInInline:      '登录',
+  authPasswordMismatch:  '两次输入的密码不一致。',
+  authPasswordMinLength: '密码至少需要 8 个字符。',
+  authImageAlt:          '爵士乐手',
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        '欢迎回来',

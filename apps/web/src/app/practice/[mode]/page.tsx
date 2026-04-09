@@ -13,7 +13,6 @@ import {
   type Card,
   type Grade,
   type Root,
-  type TwoFiveOne,
 } from '@the-shed/shared';
 import { supabase } from '@/lib/supabase/client';
 import { useAllCards, useDueCards, useInvalidateCards } from '@/hooks/use-cards';

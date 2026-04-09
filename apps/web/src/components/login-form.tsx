@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
+import { useLanguage } from "@/hooks/use-language"
+import { t } from "@/lib/translations"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
   const router = useRouter()
+  const { lang } = useLanguage()
+  const tr = t(lang)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -34,19 +38,19 @@ export function LoginForm({
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
       <div className="flex flex-col items-center gap-1 text-center">
-        <h1 className="text-2xl">Login to your account</h1>
+        <h1 className="text-2xl">{tr.authLoginTitle}</h1>
         <p className="text-sm text-balance text-muted-foreground">
-          Enter your email below to login to your account
+          {tr.authLoginSubtitle}
         </p>
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{tr.authEmail}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="m@example.com"
+            placeholder={tr.authEmailPlaceholder}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -54,7 +58,7 @@ export function LoginForm({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{tr.authPassword}</Label>
           <Input
             id="password"
             type="password"
@@ -69,13 +73,13 @@ export function LoginForm({
         )}
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Signing in…" : "Login"}
+          {loading ? tr.authSigningIn : tr.authLoginButton}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
+          {tr.authNoAccount}{" "}
           <a href="/signup" className="underline underline-offset-4 hover:text-primary">
-            Sign up
+            {tr.authSignUpLink}
           </a>
         </p>
       </div>
