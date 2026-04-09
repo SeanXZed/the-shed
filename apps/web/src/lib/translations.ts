@@ -18,7 +18,7 @@ type TranslationMap = {
   whatDegrees: string; nameChordTones: string; nameTarget: string;
   revealAnswer: string; correctAnswer: string; yourAnswer: string; noAnswer: string;
   prevCard: string; nextCard: string; nextBtn: string; hintReveal: string; hintInterval: string;
-  cramBadge: string; suggested: string;
+  cramBadge: string;
   grade1Label: string; grade1Desc: string; grade2Label: string; grade2Desc: string;
   grade3Label: string; grade3Desc: string; grade4Label: string; grade4Desc: string;
   doneTitle: string;
@@ -117,7 +117,6 @@ const en: TranslationMap = {
   hintReveal:         'Space to reveal · 1–4 to grade',
   hintInterval:       'Space to reveal · 1–4 to grade',
   cramBadge:          'Cram',
-  suggested:          '★ suggested',
 
   // ── Grades ───────────────────────────────────────────────────────────────
   grade1Label:        'Blackout',
@@ -244,7 +243,6 @@ const zh: TranslationMap = {
   hintReveal:         '空格显示 · 1–4 评分',
   hintInterval:       '空格显示 · 1–4 评分',
   cramBadge:          '强化',
-  suggested:          '★ 推荐',
 
   // ── Grades ───────────────────────────────────────────────────────────────
   grade1Label:        '完全忘记',

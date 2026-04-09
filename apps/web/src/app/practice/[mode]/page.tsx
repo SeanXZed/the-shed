@@ -628,9 +628,7 @@ function GradeButtons({ onGrade, loading, suggested, tr }: {
           >
             <span className="text-xs font-medium opacity-50">{g}</span>
             <span className="text-sm font-semibold leading-tight">{label}</span>
-            <span className="text-xs opacity-60">
-              {suggested === g ? tr.suggested : description}
-            </span>
+            <span className="text-xs opacity-60">{description}</span>
           </button>
         );
       })}
