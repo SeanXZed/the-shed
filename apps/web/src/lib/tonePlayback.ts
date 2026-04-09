@@ -74,6 +74,8 @@ function disposeActiveSynth(): void {
 
 const NOTE_GAP_SEC = 0.2;
 const NOTE_LEN_SEC = 0.2;
+const INTERVAL_NOTE_LEN_SEC = 0.5;
+const INTERVAL_GAP_SEC = 0.25;
 const BLOCK_LEN_SEC = 1.4;
 
 function scheduleDisposeAfter(ms: number, gen: number): void {
@@ -109,10 +111,10 @@ export async function playPracticeItem(
     const rootMidi = (4 + 1) * 12 + noteToSemitone(item.root);
     const answerMidi = rootMidi + delta;
     let t = now;
-    activeSynth.triggerAttackRelease(midiToNoteName(rootMidi), NOTE_LEN_SEC, t);
-    t += NOTE_GAP_SEC;
-    activeSynth.triggerAttackRelease(midiToNoteName(answerMidi), NOTE_LEN_SEC, t);
-    scheduleDisposeAfter((NOTE_LEN_SEC * 2 + NOTE_GAP_SEC + 0.2) * 1000, gen);
+    activeSynth.triggerAttackRelease(midiToNoteName(rootMidi), INTERVAL_NOTE_LEN_SEC, t);
+    t += INTERVAL_GAP_SEC;
+    activeSynth.triggerAttackRelease(midiToNoteName(answerMidi), INTERVAL_NOTE_LEN_SEC, t);
+    scheduleDisposeAfter((INTERVAL_NOTE_LEN_SEC * 2 + INTERVAL_GAP_SEC + 0.25) * 1000, gen);
     return;
   }
 
