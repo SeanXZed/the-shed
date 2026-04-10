@@ -867,7 +867,7 @@ export default function PracticeModePage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-h-0">
         <header className="flex h-16 shrink-0 items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
@@ -907,7 +907,7 @@ export default function PracticeModePage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 sm:gap-6 sm:p-6">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto p-4 sm:justify-center sm:gap-6 sm:p-6">
           {loading ? (
             <LoadingSkeleton />
           ) : showConfig ? (
@@ -1102,7 +1102,7 @@ function PracticeCard({
             onChange={e => onAnswerChange(e.target.value)}
             rows={isInterval ? 1 : 3}
             placeholder={getAnswerPlaceholder(mode, tr)}
-            className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 hover:border-ring/50 focus:ring-2 focus:ring-ring/50"
+            className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-base outline-none transition-colors placeholder:text-muted-foreground/50 hover:border-ring/50 focus:ring-2 focus:ring-ring/50 md:text-sm"
           />
         </div>
       ) : (
