@@ -1,6 +1,7 @@
 import type { Lang } from '@/hooks/use-language';
 
 type TranslationMap = {
+  appName: string;
   appSubtitle: string; navDashboard: string; navPractice: string; navScales: string;
   navChords: string; signOut: string;
 
@@ -77,6 +78,7 @@ type TranslationMap = {
 
 const en: TranslationMap = {
   // ── Sidebar ──────────────────────────────────────────────────────────────
+  appName:            'The Shed',
   appSubtitle:        'Jazz Flashcards',
   navDashboard:       'Dashboard',
   navPractice:        'Practice',
@@ -233,7 +235,8 @@ const en: TranslationMap = {
 
 const zh: TranslationMap = {
   // ── Sidebar ──────────────────────────────────────────────────────────────
-  appSubtitle:        '爵士闪卡',
+  appName:            '爵士乐棚',
+  appSubtitle:        '爵士练习卡',
   navDashboard:       '总览',
   navPractice:        '练习',
   navScales:          '音阶',

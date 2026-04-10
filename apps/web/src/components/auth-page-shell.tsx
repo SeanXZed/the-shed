@@ -18,7 +18,7 @@ export function AuthPageShell({ children }: { children: React.ReactNode }) {
             <Music className="size-4" />
           </div>
           <span className="grid min-w-0 leading-tight">
-            <span className="truncate">The Shed</span>
+            <span className="truncate">{tr.appName}</span>
             <span className="truncate text-xs text-muted-foreground">{tr.appSubtitle}</span>
           </span>
         </Link>

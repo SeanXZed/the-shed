@@ -76,7 +76,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <Music className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">The Shed</span>
+                <span className="truncate font-semibold">{tr.appName}</span>
                 <span className="truncate text-xs text-sidebar-foreground/60">{tr.appSubtitle}</span>
               </div>
             </SidebarMenuButton>
