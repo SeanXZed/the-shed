@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { z } from 'zod';
 import { Volume2 } from 'lucide-react';
 import {
   getScaleData,
@@ -82,16 +83,77 @@ const INTERVALS = [
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type PracticeConfig =
-  | { type: 'root-free';      sequenceCount: number }
-  | { type: 'root-selected';  roots: Root[]; sequenceCount: number };
+  | {
+      type: 'root-free';
+      sequenceCount: number;
+      scaleDirection: 'up' | 'down' | 'mixed';
+      chordInversions: 'root' | '1' | '2' | '3' | 'random';
+    }
+  | {
+      type: 'root-selected';
+      roots: Root[];
+      sequenceCount: number;
+      scaleDirection: 'up' | 'down' | 'mixed';
+      chordInversions: 'root' | '1' | '2' | '3' | 'random';
+    };
 
-const MODE_LABELS: Record<PracticeMode, string> = {
-  'full-scale': 'Full Scale',
-  'full-chord': 'Full Chord',
-  'sequence': 'Sequence',
-  '251': '2-5-1',
-  'interval': 'Intervals',
-};
+function rotate<T>(arr: readonly T[], by: number): T[] {
+  if (arr.length === 0) return [];
+  const n = ((by % arr.length) + arr.length) % arr.length;
+  return [...arr.slice(n), ...arr.slice(0, n)];
+}
+
+function resolveExpectedNotesWithVariants(args: {
+  item: DeckItem;
+  mode: PracticeMode;
+  sequence: string[];
+  isBb: boolean;
+  scaleDirection: 'up' | 'down' | 'mixed';
+  chordInversions: 'root' | '1' | '2' | '3' | 'random';
+  // Stable-ish random per card
+  seed: string;
+}): { expected: string[]; direction?: 'up' | 'down'; inversion?: number; inversionBass?: string } {
+  const { item, mode, sequence, isBb, scaleDirection, chordInversions, seed } = args;
+
+  // Default expected notes (existing logic)
+  const base = getExpectedNotes(item, mode, sequence, isBb);
+
+  if (mode === 'full-scale' && item.type === 'standard') {
+    let dir: 'up' | 'down' = 'up';
+    if (scaleDirection === 'down') dir = 'down';
+    else if (scaleDirection === 'mixed') dir = (seed.charCodeAt(0) % 2 === 0) ? 'up' : 'down';
+    const expected = dir === 'down' ? [...base].reverse() : base;
+    return { expected, direction: dir };
+  }
+
+  if (mode === 'full-chord' && item.type === 'standard') {
+    // 7th-chords: 4 tones. If not 4, just don't invert.
+    if (base.length !== 4) return { expected: base, inversion: 0 };
+
+    let inv: number;
+    if (chordInversions === 'root') inv = 0;
+    else if (chordInversions === '1') inv = 1;
+    else if (chordInversions === '2') inv = 2;
+    else if (chordInversions === '3') inv = 3;
+    else inv = (seed.charCodeAt(seed.length - 1) % 4); // random including root
+
+    const expected = rotate(base, inv);
+    const inversionBass = expected[0]!;
+    return { expected, inversion: inv, inversionBass };
+  }
+
+  return { expected: base };
+}
+
+function modeLabel(mode: PracticeMode, tr: Tr): string {
+  switch (mode) {
+    case 'full-scale': return tr.modeFullScale;
+    case 'full-chord': return tr.modeFullChord;
+    case 'sequence':   return tr.modeSequence;
+    case '251':        return tr.mode251;
+    case 'interval':   return tr.modeInterval;
+  }
+}
 
 const GRADE_CLASSES: Record<Grade, string> = {
   1: 'border-rose-500/40 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 dark:border-rose-500/30 dark:bg-rose-500/15 dark:hover:bg-rose-500/25',
@@ -187,16 +249,6 @@ function generateSequence(scaleType: string, count = 5): string[] {
   return degrees.slice(0, Math.min(count, degrees.length));
 }
 
-function getAnswerPlaceholder(mode: PracticeMode, tr: Tr): string {
-  switch (mode) {
-    case 'full-scale':  return tr.modeFullScaleDesc;
-    case 'full-chord':  return tr.modeFullChordDesc;
-    case 'sequence':    return tr.whatDegrees;
-    case '251':         return tr.nameChordTones;
-    case 'interval':    return tr.nameTarget;
-  }
-}
-
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 
 interface AnswerScore {
@@ -226,6 +278,21 @@ function parseNotes(input: string): string[] {
     .split(/[\s,/|+\n]+/)
     .map(canonicalNote)
     .filter(n => n.length > 0);
+}
+
+const NOTE_INPUT_SCHEMA = z
+  .string()
+  .trim()
+  .regex(/^[A-Ga-g](?:b|#)?$/, 'Invalid note');
+
+function canonicalizeNoteInput(raw: string): string {
+  const s = raw.trim();
+  if (!s) return '';
+  const letter = s[0]!.toUpperCase();
+  const acc = (s[1] ?? '').toLowerCase();
+  if (acc === 'b') return `${letter}b`;
+  if (acc === '#') return `${letter}#`;
+  return letter;
 }
 
 function scoreAnswer(userInput: string, expectedNotes: string[]): AnswerScore {
@@ -318,12 +385,13 @@ function NoteRow({ notes, degrees }: { notes: readonly string[]; degrees: readon
 
 // ─── Card faces ───────────────────────────────────────────────────────────────
 
-function StandardFront({ item, mode, sequence, isBb, tr }: {
+function StandardFront({ item, mode, sequence, isBb, tr, inversionBass }: {
   item: StandardItem;
   mode: PracticeMode;
   sequence: string[];
   isBb: boolean;
   tr: Tr;
+  inversionBass?: string | undefined;
 }) {
   const data = getScaleData(item.card.root as Root, item.card.scale_type);
   const displayRoot = isBb ? data.trumpetNotes[0] : item.card.root;
@@ -340,10 +408,11 @@ function StandardFront({ item, mode, sequence, isBb, tr }: {
   }
 
   if (mode === 'full-chord') {
+    const symbol = inversionBass ? `${chordSymbol}/${inversionBass}` : chordSymbol;
     return (
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground uppercase tracking-widest">{tr.labelChordTones}</p>
-        <p className="text-5xl font-bold">{chordSymbol}</p>
+        <p className="text-5xl font-bold">{symbol}</p>
       </div>
     );
   }
@@ -613,11 +682,13 @@ export default function PracticeModePage() {
   const [done, setDone] = useState(false);
   const [isCram, setIsCram] = useState(false);
   const [sequence, setSequence] = useState<string[]>([]);
-  const [userAnswer, setUserAnswer] = useState('');
+  const [userAnswerTokens, setUserAnswerTokens] = useState<string[]>([]);
   const [score, setScore] = useState<AnswerScore | null>(null);
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [chordPlayMode, setChordPlayModeState] = useState<ChordPlayMode>(() => getChordPlayMode());
   const [playing, setPlaying] = useState(false);
+  const [expectedNotes, setExpectedNotes] = useState<string[]>([]);
+  const [variantMeta, setVariantMeta] = useState<{ direction?: 'up' | 'down'; inversion?: number; inversionBass?: string }>({});
 
   const { isBb, toggle: toggleBb } = useBb();
   const { lang } = useLanguage();
@@ -630,6 +701,7 @@ export default function PracticeModePage() {
   const correctCountRef = useRef(0);
   /** Only rebuild deck + reset index when mode/config change — not when dueCards/allCards refetch after invalidate(). */
   const deckBuildKeyRef = useRef<string | null>(null);
+  const sessionSeedRef = useRef<string>('seed');
 
   // Auth gate
   useEffect(() => {
@@ -664,13 +736,14 @@ export default function PracticeModePage() {
     if (deckBuildKeyRef.current === buildKey) return;
 
     deckBuildKeyRef.current = buildKey;
+    sessionSeedRef.current = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const { deck: built, isCram: cram } = buildDeck(practiceMode, dueCards, allCards, config);
     setDeck(built);
     setIsCram(cram);
     setIndex(0);
     setFlipped(false);
     setDone(false);
-    setUserAnswer('');
+    setUserAnswerTokens([]);
     setScore(null);
     reviewedCountRef.current = 0;
     correctCountRef.current = 0;
@@ -727,6 +800,38 @@ export default function PracticeModePage() {
     }
   }, [index, deck, practiceMode, config]);
 
+  // Resolve expected notes for current card (includes scale direction / chord inversions)
+  useEffect(() => {
+    const item = deck[index];
+    if (!item || !config) {
+      setExpectedNotes([]);
+      setVariantMeta({});
+      return;
+    }
+    const seed =
+      item.type === 'standard'
+        ? `${sessionSeedRef.current}:${item.card.id}`
+        : item.type === 'interval'
+          ? `${sessionSeedRef.current}:${item.root}:${item.intervalId}:${item.direction}`
+          : `${sessionSeedRef.current}:${item.key}:${item.tonality}`;
+    const resolved = resolveExpectedNotesWithVariants({
+      item,
+      mode: practiceMode,
+      sequence,
+      isBb,
+      scaleDirection: config.scaleDirection,
+      chordInversions: config.chordInversions,
+      seed,
+    });
+    setExpectedNotes(resolved.expected);
+    setVariantMeta({
+      ...(resolved.direction ? { direction: resolved.direction } : {}),
+      ...(typeof resolved.inversion === 'number' ? { inversion: resolved.inversion } : {}),
+      ...(resolved.inversionBass ? { inversionBass: resolved.inversionBass } : {}),
+    });
+    setUserAnswerTokens((prev) => Array.from({ length: resolved.expected.length }, (_, i) => prev[i] ?? ''));
+  }, [deck, index, practiceMode, sequence, isBb, config]);
+
   // Keyboard shortcuts
   const handleGradeRef = useRef<((g: Grade) => void) | null>(null);
   const handleNextRef = useRef<(() => void) | null>(null);
@@ -754,7 +859,7 @@ export default function PracticeModePage() {
     } else {
       setIndex(next);
       setFlipped(false);
-      setUserAnswer('');
+      setUserAnswerTokens([]);
       setScore(null);
       if (practiceMode === 'sequence') {
         const nextItem = deck[next];
@@ -773,7 +878,7 @@ export default function PracticeModePage() {
     if (index === 0) return;
     setIndex(index - 1);
     setFlipped(false);
-    setUserAnswer('');
+    setUserAnswerTokens([]);
     setScore(null);
     setGradeError(null);
   }, [index]);
@@ -783,7 +888,7 @@ export default function PracticeModePage() {
     setIndex(0);
     setFlipped(false);
     setDone(false);
-    setUserAnswer('');
+    setUserAnswerTokens([]);
     setScore(null);
     setGradeError(null);
     sessionIdRef.current = null;
@@ -828,10 +933,10 @@ export default function PracticeModePage() {
   const handleAutoNext = useCallback(async () => {
     const item = deck[index];
     if (!item) return;
-    const expected = getExpectedNotes(item, practiceMode, sequence, isBb);
-    const s = userAnswer.trim() ? scoreAnswer(userAnswer, expected) : null;
+    const userAnswer = userAnswerTokens.join(' ').trim();
+    const s = userAnswer ? scoreAnswer(userAnswer, expectedNotes) : null;
     await handleGrade(s?.suggestedGrade ?? 1);
-  }, [deck, index, practiceMode, sequence, isBb, userAnswer, handleGrade]);
+  }, [deck, index, userAnswerTokens, handleGrade, expectedNotes]);
 
   const handleChordPlayModeChange = useCallback((m: ChordPlayMode) => {
     setChordPlayModeState(m);
@@ -862,7 +967,7 @@ export default function PracticeModePage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const modeLabel = MODE_LABELS[practiceMode] ?? practiceMode;
+  const modeLabelText = modeLabel(practiceMode, tr);
 
   return (
     <SidebarProvider>
@@ -874,11 +979,11 @@ export default function PracticeModePage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/practice">Practice</BreadcrumbLink>
+                <BreadcrumbLink href="/practice">{tr.navPractice}</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>{modeLabel}</BreadcrumbPage>
+                <BreadcrumbPage>{modeLabelText}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -892,9 +997,9 @@ export default function PracticeModePage() {
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground',
               )}
-              title={isBb ? 'Showing Bb transposition — click for concert pitch' : 'Showing concert pitch — click for Bb'}
+              title={isBb ? tr.pitchTooltipBb : tr.pitchTooltipConcert}
             >
-              {isBb ? 'Bb' : 'Concert'}
+              {isBb ? 'Bb' : tr.pitchConcert}
             </button>
             <Button
               variant="outline"
@@ -902,7 +1007,7 @@ export default function PracticeModePage() {
               onClick={handleNewSession}
               disabled={!deck.length && !done}
             >
-              New Session
+              {tr.newSession}
             </Button>
           </div>
         </header>
@@ -928,14 +1033,15 @@ export default function PracticeModePage() {
               total={deck.length}
               isCram={isCram}
               config={config}
-              userAnswer={userAnswer}
+              userAnswerTokens={userAnswerTokens}
+              expectedNotes={expectedNotes}
+              variantMeta={variantMeta}
               score={score}
               gradeError={gradeError}
-              onAnswerChange={setUserAnswer}
+              onAnswerChange={setUserAnswerTokens}
               onFlip={() => {
-                const item = deck[index]!;
-                const expected = getExpectedNotes(item, practiceMode, sequence, isBb);
-                setScore(userAnswer.trim() ? scoreAnswer(userAnswer, expected) : null);
+                const userAnswer = userAnswerTokens.join(' ').trim();
+                setScore(userAnswer ? scoreAnswer(userAnswer, expectedNotes) : null);
                 setFlipped(true);
               }}
               onGrade={handleGrade}
@@ -967,7 +1073,9 @@ function PracticeCard({
   total,
   isCram,
   config,
-  userAnswer,
+  userAnswerTokens,
+  expectedNotes,
+  variantMeta,
   score,
   gradeError,
   onAnswerChange,
@@ -991,10 +1099,12 @@ function PracticeCard({
   total: number;
   isCram: boolean;
   config: PracticeConfig | null;
-  userAnswer: string;
+  userAnswerTokens: string[];
+  expectedNotes: string[];
+  variantMeta: { direction?: 'up' | 'down'; inversion?: number; inversionBass?: string };
   score: AnswerScore | null;
   gradeError: string | null;
-  onAnswerChange: (v: string) => void;
+  onAnswerChange: (v: string[]) => void;
   onFlip: () => void;
   onGrade: (g: Grade) => void;
   onBack: () => void;
@@ -1008,6 +1118,7 @@ function PracticeCard({
   const isInterval = item.type === 'interval';
   const showChordPlayback = mode === 'full-chord' || mode === '251';
   const isRootSelected = config?.type === 'root-selected';
+  const expectedCount = expectedNotes.length;
   const rootsBadge =
     config?.type === 'root-selected'
       ? (config.roots.length <= 3
@@ -1083,7 +1194,7 @@ function PracticeCard({
       {/* Prompt card */}
       <div className="min-h-52 rounded-xl border bg-card p-8 shadow-sm flex items-center justify-center">
         {item.type === 'standard' ? (
-          <StandardFront item={item} mode={mode} sequence={sequence} isBb={isBb} tr={tr} />
+          <StandardFront item={item} mode={mode} sequence={sequence} isBb={isBb} tr={tr} inversionBass={variantMeta.inversionBass} />
         ) : item.type === 'interval' ? (
           <IntervalFront item={item} isBb={isBb} tr={tr} />
         ) : (
@@ -1097,16 +1208,14 @@ function PracticeCard({
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
             {tr.yourAnswer}
           </label>
-          <textarea
-            value={userAnswer}
-            onChange={e => onAnswerChange(e.target.value)}
-            rows={isInterval ? 1 : 3}
-            placeholder={getAnswerPlaceholder(mode, tr)}
-            className="w-full resize-none rounded-lg border border-border bg-background px-4 py-3 text-base outline-none transition-colors placeholder:text-muted-foreground/50 hover:border-ring/50 focus:ring-2 focus:ring-ring/50 md:text-sm"
+          <NoteBoxesInput
+            count={expectedCount}
+            values={userAnswerTokens}
+            onChange={onAnswerChange}
           />
         </div>
       ) : (
-        <AnswerReview userAnswer={userAnswer} score={score} tr={tr} />
+        <AnswerReview userAnswer={userAnswerTokens.join(' ')} score={score} tr={tr} />
       )}
 
       {/* Correct answer — only shown after reveal */}
@@ -1163,8 +1272,133 @@ function PracticeCard({
   );
 }
 
+function NoteBoxesInput({
+  count,
+  values,
+  onChange,
+}: {
+  count: number;
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const [invalidIdx, setInvalidIdx] = useState<number | null>(null);
+
+  // Normalize length to exactly count (preserve existing tokens)
+  useEffect(() => {
+    const next = Array.from({ length: count }, (_, i) => values[i] ?? '');
+    const same =
+      next.length === values.length &&
+      next.every((v, i) => v === values[i]);
+    if (!same) onChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count]);
+
+  const focusIdx = useCallback((i: number) => {
+    const el = inputRefs.current[i];
+    el?.focus();
+    el?.select();
+  }, []);
+
+  const setAt = useCallback((idx: number, raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+      setInvalidIdx(null);
+      const next = [...values];
+      next[idx] = '';
+      onChange(next);
+      return;
+    }
+
+    const canon = canonicalizeNoteInput(trimmed);
+    const parsed = NOTE_INPUT_SCHEMA.safeParse(canon);
+    if (!parsed.success) {
+      setInvalidIdx(idx);
+      return;
+    }
+    setInvalidIdx(null);
+    const next = [...values];
+    next[idx] = parsed.data;
+    onChange(next);
+  }, [onChange, values]);
+
+  const onPaste = useCallback((idx: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+    const tokens = parseNotes(text);
+    if (tokens.length <= 1) return;
+    e.preventDefault();
+    const next = [...Array.from({ length: count }, (_, i) => values[i] ?? '')];
+    for (let i = 0; i < tokens.length && (idx + i) < count; i++) {
+      const canon = canonicalizeNoteInput(tokens[i] ?? '');
+      if (NOTE_INPUT_SCHEMA.safeParse(canon).success) next[idx + i] = canon;
+    }
+    onChange(next);
+    focusIdx(Math.min(idx + tokens.length, count - 1));
+  }, [count, focusIdx, onChange, values]);
+
+  return (
+    <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-background px-3 py-3 hover:border-ring/50 focus-within:ring-2 focus-within:ring-ring/50">
+      {Array.from({ length: count }, (_, i) => {
+        const v = values[i] ?? '';
+        const isInvalid = invalidIdx === i;
+        return (
+          <input
+            key={i}
+            ref={(el) => { inputRefs.current[i] = el; }}
+            value={v}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            onPaste={(e) => onPaste(i, e)}
+            onChange={(e) => {
+              const nextRaw = e.target.value;
+              // allow user to type, but keep it short and note-shaped
+              const cleaned = nextRaw.replace(/\s+/g, '').slice(0, 2);
+              setAt(i, cleaned);
+              const canon = canonicalizeNoteInput(cleaned);
+              const isValid = NOTE_INPUT_SCHEMA.safeParse(canon).success;
+              // Auto-advance only once the note is "complete":
+              // - two-character notes like Bb/F# should advance after 2 chars
+              // - single-letter notes (C, D, E, ...) should NOT auto-advance (so user can still type b/#)
+              if (isValid && canon.length === 2 && i < count - 1) focusIdx(i + 1);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                focusIdx(Math.max(0, i - 1));
+              } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                focusIdx(Math.min(count - 1, i + 1));
+              } else if (e.key === 'Backspace') {
+                const cur = (values[i] ?? '').trim();
+                if (cur === '' && i > 0) {
+                  e.preventDefault();
+                  focusIdx(i - 1);
+                }
+              } else if (e.key === ' ' || e.key === 'Enter') {
+                // treat as "next box"
+                e.preventDefault();
+                focusIdx(Math.min(count - 1, i + 1));
+              }
+            }}
+            className={cn(
+              'h-11 w-17 rounded-md border bg-background px-3 text-center font-mono text-base tabular-nums outline-none transition-colors md:text-sm',
+              isInvalid ? 'border-rose-500/60 ring-1 ring-rose-500/30' : 'border-border focus:border-ring',
+            )}
+            aria-invalid={isInvalid}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c: PracticeConfig) => void; tr: Tr }) {
   const [sequenceCount, setSequenceCount] = useState(5);
+  const [scaleDirection, setScaleDirection] = useState<'up' | 'down' | 'mixed'>('up');
+  const [chordInversions, setChordInversions] = useState<'root' | '1' | '2' | '3' | 'random'>('root');
   const [selectedRoots, setSelectedRoots] = useState<Root[]>([]);
   const rootLabelMap: Record<PracticeMode, string> = {
     'full-scale': tr.rootLabelScale,
@@ -1184,7 +1418,7 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
   return (
     <div className="w-full max-w-lg space-y-8">
       <div className="text-center space-y-1">
-        <p className="text-sm text-muted-foreground uppercase tracking-widest">{MODE_LABELS[mode]}</p>
+        <p className="text-sm text-muted-foreground uppercase tracking-widest">{modeLabel(mode, tr)}</p>
         <h2 className="text-2xl font-semibold">{tr.configTitle}</h2>
       </div>
 
@@ -1213,9 +1447,69 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
         </div>
       )}
 
+      {/* Scale direction */}
+      {mode === 'full-scale' && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest text-center">
+            {tr.configDirection}
+          </p>
+          <div className="flex justify-center gap-2">
+            {([
+              { id: 'up' as const, label: tr.dirUp },
+              { id: 'down' as const, label: tr.dirDown },
+              { id: 'mixed' as const, label: tr.dirMixed },
+            ]).map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setScaleDirection(opt.id)}
+                className={cn(
+                  'h-10 rounded-lg border px-3 text-sm font-semibold transition-all',
+                  scaleDirection === opt.id
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card hover:border-ring/50 hover:bg-accent',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chord inversions */}
+      {mode === 'full-chord' && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest text-center">
+            {tr.configInversions}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {([
+              { id: 'root' as const, label: tr.invRootOnly },
+              { id: '1' as const, label: tr.inv1 },
+              { id: '2' as const, label: tr.inv2 },
+              { id: '3' as const, label: tr.inv3 },
+              { id: 'random' as const, label: tr.invRandom },
+            ]).map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setChordInversions(opt.id)}
+                className={cn(
+                  'h-10 rounded-lg border px-3 text-sm font-semibold transition-all',
+                  chordInversions === opt.id
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card hover:border-ring/50 hover:bg-accent',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Root Free */}
       <button
-        onClick={() => onSelect({ type: 'root-free', sequenceCount })}
+        onClick={() => onSelect({ type: 'root-free', sequenceCount, scaleDirection, chordInversions })}
         className="w-full rounded-xl border bg-card p-5 text-left shadow-sm transition-all hover:border-ring/50 hover:shadow-md"
       >
         <p className="font-semibold text-base">{tr.configRootFree}</p>
@@ -1245,7 +1539,7 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
           size="lg"
           className="w-full min-h-11"
           disabled={selectedRoots.length === 0}
-          onClick={() => onSelect({ type: 'root-selected', roots: selectedRoots, sequenceCount })}
+          onClick={() => onSelect({ type: 'root-selected', roots: selectedRoots, sequenceCount, scaleDirection, chordInversions })}
         >
           {tr.modeStart}
         </Button>

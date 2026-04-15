@@ -78,7 +78,7 @@ export default function ScalesPage() {
                 : 'border-border bg-background text-muted-foreground hover:text-foreground',
             )}
           >
-            {isBb ? 'Bb' : 'Concert'}
+            {isBb ? 'Bb' : tr.pitchConcert}
           </button>
         </header>
 

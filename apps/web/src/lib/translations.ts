@@ -58,6 +58,21 @@ type TranslationMap = {
   doneFree: (n: number) => string;
   newSession: string; backToModes: string;
 
+  pitchConcert: string;
+  pitchTooltipBb: string;
+  pitchTooltipConcert: string;
+
+  configDirection: string;
+  dirUp: string;
+  dirDown: string;
+  dirMixed: string;
+  configInversions: string;
+  invRootOnly: string;
+  inv1: string;
+  inv2: string;
+  inv3: string;
+  invRandom: string;
+
   // ── Scale library ─────────────────────────────────────────────────────────
   scaleLibraryTitle: string; scaleLibrarySubtitle: string;
   searchScalePlaceholder: string; filterAll: string;
@@ -198,6 +213,21 @@ const en: TranslationMap = {
   newSession:         'New Session',
   backToModes:        'Back to modes',
 
+  pitchConcert:       'Concert',
+  pitchTooltipBb:     'Showing Bb transposition — click for concert pitch',
+  pitchTooltipConcert:'Showing concert pitch — click for Bb',
+
+  configDirection:    'Direction',
+  dirUp:              'Up',
+  dirDown:            'Down',
+  dirMixed:           'Mixed',
+  configInversions:   'Inversions',
+  invRootOnly:        'Root only',
+  inv1:               '1st inv.',
+  inv2:               '2nd inv.',
+  inv3:               '3rd inv.',
+  invRandom:          'Random',
+
   // ── Scale library ─────────────────────────────────────────────────────────
   scaleLibraryTitle:    'Scale Library',
   scaleLibrarySubtitle: '17 scales × 12 roots — your full 204-card library.',
@@ -332,7 +362,7 @@ const zh: TranslationMap = {
   hintReveal:         '空格显示 · 1–4 评分',
   hintInterval:       '空格显示 · 1–4 评分',
   playAudio:          '播放',
-  chordPlaybackBlock: '柱式',
+  chordPlaybackBlock: '和弦',
   chordPlaybackArpeggio: '上下行',
   cramBadge:          '强化',
 
@@ -354,6 +384,21 @@ const zh: TranslationMap = {
   doneFree:           (n: number) => `复习了 ${n} 张待复习卡片。`,
   newSession:         '新练习',
   backToModes:        '返回模式',
+
+  pitchConcert:       '原调',
+  pitchTooltipBb:     '当前为 Bb 移调显示 — 点击切换为原调',
+  pitchTooltipConcert:'当前为原调显示 — 点击切换为 Bb 移调',
+
+  configDirection:    '方向',
+  dirUp:              '上行',
+  dirDown:            '下行',
+  dirMixed:           '随机',
+  configInversions:   '转位',
+  invRootOnly:        '原位',
+  inv1:               '第一转位',
+  inv2:               '第二转位',
+  inv3:               '第三转位',
+  invRandom:          '随机',
 
   // ── Scale library ─────────────────────────────────────────────────────────
   scaleLibraryTitle:    '音阶库',
