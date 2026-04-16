@@ -4,20 +4,27 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
-import { Volume2 } from 'lucide-react';
+import { Loader2, Volume2 } from 'lucide-react';
 import {
   getScaleData,
+  getScaleDefinition,
+  getChordTones,
+  getChordSymbol,
   get251,
   SCALE_MAP,
   ROOTS,
   transposeNote,
-  type Card,
+  transposeNotes,
+  BB_OFFSET,
+  EB_OFFSET,
+  type ChordQuality,
   type Grade,
   type Root,
 } from '@the-shed/shared';
 import { supabase } from '@/lib/supabase/client';
-import { useAllCards, useDueCards, useInvalidateCards } from '@/hooks/use-cards';
-import { useBb } from '@/hooks/use-bb';
+import { useAllGameItems, useDueGameItems, useInvalidateGameItems, type GameItemRow } from '@/hooks/use-game-items';
+import { usePitch } from '@/hooks/use-bb';
+import { useAdaptiveWeights } from '@/hooks/use-adaptive';
 import { useLanguage } from '@/hooks/use-language';
 import { t } from '@/lib/translations';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -38,6 +45,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { getEventXp } from '@/lib/xp';
 import {
   type DeckItem,
   type IntervalItem,
@@ -64,7 +72,16 @@ const SLUG_TO_DB_MODE: Record<string, string> = {
   '251': '251',
 };
 
+const DB_MODE_TO_GAME_SLUG: Record<string, 'full_scale' | 'full_chord' | 'sequence' | 'progression_251' | 'interval'> = {
+  full_scale: 'full_scale',
+  full_chord: 'full_chord',
+  sequence: 'sequence',
+  '251': 'progression_251',
+  interval: 'interval',
+};
+
 const SESSION_SIZE = 20;
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 const INTERVALS = [
   { id: 'm2',  name: 'Minor 2nd',   semitones: 1  },
@@ -107,16 +124,16 @@ function resolveExpectedNotesWithVariants(args: {
   item: DeckItem;
   mode: PracticeMode;
   sequence: string[];
-  isBb: boolean;
+  semitoneOffset: number;
   scaleDirection: 'up' | 'down' | 'mixed';
   chordInversions: 'root' | '1' | '2' | '3' | 'random';
   // Stable-ish random per card
   seed: string;
-}): { expected: string[]; direction?: 'up' | 'down'; inversion?: number; inversionBass?: string } {
-  const { item, mode, sequence, isBb, scaleDirection, chordInversions, seed } = args;
+}): { expected: string[]; direction?: 'up' | 'down'; inversion?: number } {
+  const { item, mode, sequence, semitoneOffset, scaleDirection, chordInversions, seed } = args;
 
   // Default expected notes (existing logic)
-  const base = getExpectedNotes(item, mode, sequence, isBb);
+  const base = getExpectedNotes(item, mode, sequence, semitoneOffset);
 
   if (mode === 'full-scale' && item.type === 'standard') {
     let dir: 'up' | 'down' = 'up';
@@ -138,8 +155,7 @@ function resolveExpectedNotesWithVariants(args: {
     else inv = (seed.charCodeAt(seed.length - 1) % 4); // random including root
 
     const expected = rotate(base, inv);
-    const inversionBass = expected[0]!;
-    return { expected, inversion: inv, inversionBass };
+    return { expected, inversion: inv };
   }
 
   return { expected: base };
@@ -175,65 +191,157 @@ function shuffled<T>(arr: T[]): T[] {
   return a;
 }
 
+function weightedSample<T>(
+  items: readonly T[],
+  count: number,
+  weightOf: (item: T) => number,
+): T[] {
+  if (items.length === 0 || count <= 0) return [];
+
+  const pool = [...items];
+  const out: T[] = [];
+
+  while (out.length < count) {
+    // If we exhausted the pool, start again (allows repeats when pool < count).
+    if (pool.length === 0) pool.push(...items);
+
+    let total = 0;
+    const weights = pool.map((it) => {
+      const w = Math.max(0, weightOf(it));
+      total += w;
+      return w;
+    });
+
+    // Fallback to uniform if all weights are zero.
+    if (total <= 0) {
+      out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]!);
+      continue;
+    }
+
+    let r = Math.random() * total;
+    let idx = 0;
+    for (; idx < pool.length; idx++) {
+      r -= weights[idx] ?? 0;
+      if (r <= 0) break;
+    }
+    const pickedIdx = Math.min(idx, pool.length - 1);
+    out.push(pool.splice(pickedIdx, 1)[0]!);
+  }
+
+  return out;
+}
+
 function buildDeck(
   mode: PracticeMode,
-  dueCards: Card[],
-  allCards: Card[],
+  dueItems: GameItemRow[],
+  allItems: GameItemRow[],
   config: PracticeConfig | null,
+  weights: Record<string, number> | null,
 ): { deck: DeckItem[]; isCram: boolean } {
   if (mode === 'interval') {
-    const roots = config?.type === 'root-selected' ? config.roots : [...ROOTS];
-    const items: IntervalItem[] = [];
-    for (const root of roots) {
-      for (const interval of INTERVALS) {
-        const direction = Math.random() < 0.5 ? 'up' : 'down';
-        const semitones = direction === 'up' ? interval.semitones : -interval.semitones;
-        const answer = transposeNote(root, semitones);
-        items.push({ type: 'interval', root, intervalId: interval.id, intervalName: interval.name, semitones: interval.semitones, direction, answer });
-      }
+    const roots = config?.type === 'root-selected' ? new Set(config.roots) : null;
+    const parsed: IntervalItem[] = [];
+    for (const it of allItems) {
+      const [intervalId, root, direction] = it.canonical_key.split('::');
+      if (!intervalId) continue;
+      const intervalMeta = INTERVALS.find((x) => x.id === intervalId);
+      if (!intervalMeta) continue;
+      if (!root || (roots && !roots.has(root as Root))) continue;
+      if (direction !== 'up' && direction !== 'down') continue;
+      const semitones = direction === 'up' ? intervalMeta.semitones : -intervalMeta.semitones;
+      const answer = transposeNote(root, semitones);
+      parsed.push({
+        type: 'interval',
+        gameItemId: it.id,
+        canonicalKey: it.canonical_key,
+        root: root as Root,
+        intervalId,
+        intervalName: intervalMeta.name,
+        semitones: intervalMeta.semitones,
+        direction,
+        answer,
+      });
     }
     const result: DeckItem[] = [];
-    while (result.length < SESSION_SIZE) result.push(...shuffled(items));
+    while (result.length < SESSION_SIZE) result.push(...shuffled(parsed));
     return { deck: result.slice(0, SESSION_SIZE), isCram: false };
   }
 
   if (mode === '251') {
-    const keys = config?.type === 'root-selected' ? config.roots : [...ROOTS];
+    const keys = config?.type === 'root-selected' ? new Set(config.roots) : null;
     const items: TwoFiveOneItem[] = [];
-    for (const key of keys) {
-      for (const tonality of ['major', 'minor'] as const) {
-        const combo = get251(key, tonality);
-        const iiCard = allCards.find(c => c.root === combo.ii.root && c.scale_type === combo.ii.scaleType);
-        const vCard = allCards.find(c => c.root === combo.V.root && c.scale_type === combo.V.scaleType);
-        const iCard = allCards.find(c => c.root === combo.I.root && c.scale_type === combo.I.scaleType);
-        if (iiCard && vCard && iCard) {
-          items.push({ type: '251', key, tonality, combo, cards: { ii: iiCard, V: vCard, I: iCard } });
-        }
-      }
+    for (const it of allItems) {
+      const parts = it.canonical_key.split('::');
+      if (parts[0] !== '251') continue;
+      const key = parts[1] as Root | undefined;
+      const tonality = parts[2] === 'minor' ? 'minor' : parts[2] === 'major' ? 'major' : null;
+      if (!key || !tonality) continue;
+      if (keys && !keys.has(key)) continue;
+      items.push({
+        type: '251',
+        gameItemId: it.id,
+        canonicalKey: it.canonical_key,
+        key,
+        tonality,
+        combo: get251(key, tonality),
+      });
     }
     const result: DeckItem[] = [];
     while (result.length < SESSION_SIZE) result.push(...shuffled(items));
     return { deck: result.slice(0, SESSION_SIZE), isCram: false };
   }
 
-  // Scale modes (full-scale, full-chord, sequence)
+  // Standard modes (full-scale, full-chord, sequence)
   if (config?.type === 'root-selected') {
-    const rootsSet = new Set(config.roots);
-    const rootCards = allCards.filter(c => rootsSet.has(c.root as Root));
-    const result: DeckItem[] = [];
-    while (result.length < SESSION_SIZE) {
-      result.push(...shuffled(rootCards.map(card => ({ type: 'standard' as const, card }))));
-    }
-    return { deck: result.slice(0, SESSION_SIZE), isCram: false };
+    const rootsSet = new Set(config.roots as Root[]);
+    const rootItems = allItems.filter((it) => {
+      const parts = it.canonical_key.split('::');
+      return rootsSet.has(parts[1] as Root);
+    });
+    const chosen = weightedSample(
+      rootItems,
+      SESSION_SIZE,
+      (it) => {
+        return weights?.[it.canonical_key] ?? 1;
+      },
+    );
+    return { deck: chosen.map((it) => toStandardItem(mode, it)).filter(Boolean) as DeckItem[], isCram: false };
   }
 
   // root-free: due queue capped at SESSION_SIZE
-  const source = dueCards.length > 0 ? dueCards : allCards;
-  const isCram = dueCards.length === 0;
+  const source = dueItems.length > 0 ? dueItems : allItems;
+  const isCram = dueItems.length === 0;
   return {
-    deck: shuffled(source.map(card => ({ type: 'standard' as const, card }))).slice(0, SESSION_SIZE),
+    deck: weightedSample(
+      source,
+      SESSION_SIZE,
+      (it) => {
+        return weights?.[it.canonical_key] ?? 1;
+      },
+    ).map((it) => toStandardItem(mode, it)).filter(Boolean) as DeckItem[],
     isCram,
   };
+}
+
+function toStandardItem(mode: PracticeMode, it: GameItemRow): StandardItem | null {
+  const parts = it.canonical_key.split('::');
+  if (mode === 'full-chord') {
+    const chordQuality = parts[0];
+    const root = parts[1] as Root | undefined;
+    if (!chordQuality || !root) return null;
+    return {
+      type: 'standard',
+      kind: 'chord',
+      gameItemId: it.id,
+      canonicalKey: it.canonical_key,
+      root,
+      chordQuality: chordQuality as ChordQuality,
+    };
+  }
+  const scaleType = parts[0];
+  const root = parts[1] as Root | undefined;
+  if (!scaleType || !root) return null;
+  return { type: 'standard', kind: mode === 'sequence' ? 'sequence' : 'scale', gameItemId: it.id, canonicalKey: it.canonical_key, root, scaleType };
 }
 
 function generateSequence(scaleType: string, count = 5): string[] {
@@ -317,46 +425,27 @@ function scoreAnswer(userInput: string, expectedNotes: string[]): AnswerScore {
 }
 
 async function gradeCard(
-  cardId: string,
+  gameItemId: string,
   grade: Grade,
   sessionId?: string,
   practiceMode?: string,
   isCram?: boolean,
+  meta?: Record<string, unknown>,
 ): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(`/api/cards/${cardId}/grade`, {
+  const res = await fetch(`/api/game-items/${gameItemId}/grade`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
     body: JSON.stringify({
       grade,
       ...(isCram ? { is_cram: true } : {}),
       ...(sessionId ? { session_id: sessionId, practice_mode: practiceMode } : {}),
+      ...(meta ? { meta } : {}),
     }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
     throw new Error(body.detail ?? body.error ?? `Grade failed (${res.status})`);
-  }
-}
-
-async function gradeInterval(
-  grade: Grade,
-  sessionId?: string,
-  root?: string,
-): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch('/api/interval/grade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-    body: JSON.stringify({
-      grade,
-      ...(sessionId ? { session_id: sessionId } : {}),
-      ...(root ? { root } : {}),
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
-    throw new Error(body.detail ?? body.error ?? `Interval grade failed (${res.status})`);
   }
 }
 
@@ -385,19 +474,23 @@ function NoteRow({ notes, degrees }: { notes: readonly string[]; degrees: readon
 
 // ─── Card faces ───────────────────────────────────────────────────────────────
 
-function StandardFront({ item, mode, sequence, isBb, tr, inversionBass }: {
+function StandardFront({ item, mode, sequence, semitoneOffset, tr }: {
   item: StandardItem;
   mode: PracticeMode;
   sequence: string[];
-  isBb: boolean;
+  semitoneOffset: number;
   tr: Tr;
-  inversionBass?: string | undefined;
 }) {
-  const data = getScaleData(item.card.root as Root, item.card.scale_type);
-  const displayRoot = isBb ? data.trumpetNotes[0] : item.card.root;
-  const chordSymbol = isBb ? data.trumpetChordSymbol : data.concertChordSymbol;
+  const displayRoot = semitoneOffset === 0 ? item.root : transposeNote(item.root, semitoneOffset);
+  const chordSymbol = (() => {
+    if (item.kind === 'chord') return getChordSymbol(displayRoot, item.chordQuality);
+    const def = getScaleDefinition(item.scaleType);
+    return getChordSymbol(displayRoot, def.chordQuality);
+  })();
 
   if (mode === 'full-scale') {
+    if (item.kind === 'chord') return null;
+    const data = getScaleData(item.root, item.scaleType);
     return (
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground uppercase tracking-widest">{tr.labelScale}</p>
@@ -408,16 +501,17 @@ function StandardFront({ item, mode, sequence, isBb, tr, inversionBass }: {
   }
 
   if (mode === 'full-chord') {
-    const symbol = inversionBass ? `${chordSymbol}/${inversionBass}` : chordSymbol;
     return (
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground uppercase tracking-widest">{tr.labelChordTones}</p>
-        <p className="text-5xl font-bold">{symbol}</p>
+        <p className="text-5xl font-bold">{chordSymbol}</p>
       </div>
     );
   }
 
   // sequence — show degree numbers only (no # or b); user knows the scale so knows the quality
+  if (item.kind === 'chord') return null;
+  const data = getScaleData(item.root, item.scaleType);
   return (
     <div className="text-center space-y-4">
       <div className="space-y-1">
@@ -432,20 +526,37 @@ function StandardFront({ item, mode, sequence, isBb, tr, inversionBass }: {
   );
 }
 
-function StandardBack({ item, mode, sequence, isBb }: {
+function StandardBack({ item, mode, sequence, semitoneOffset }: {
   item: StandardItem;
   mode: PracticeMode;
   sequence: string[];
-  isBb: boolean;
+  semitoneOffset: number;
 }) {
-  const data = getScaleData(item.card.root as Root, item.card.scale_type);
-  const notes = isBb ? data.trumpetNotes : data.concertNotes;
-  const chordTones = isBb ? data.trumpetChordTones : data.concertChordTones;
+  if (mode === 'full-chord' && item.kind === 'chord') {
+    const displayRoot = semitoneOffset ? (transposeNote(item.root, semitoneOffset) as Root) : item.root;
+    const tones = getChordTones(displayRoot, item.chordQuality);
+    return (
+      <div className="space-y-3 text-center">
+        <p className="text-sm text-muted-foreground">
+          {getChordSymbol(displayRoot, item.chordQuality)}
+        </p>
+        <NoteRow notes={tones} degrees={['1', '3', '5', '7']} />
+      </div>
+    );
+  }
+
+  if (item.kind === 'chord') return null;
+  const data = getScaleData(item.root, item.scaleType);
+  const def = getScaleDefinition(item.scaleType);
+  const notes = semitoneOffset ? transposeNotes(data.concertNotes, semitoneOffset) : data.concertNotes;
+  const chordTones = getChordTones((semitoneOffset ? transposeNote(item.root, semitoneOffset) : item.root) as Root, def.chordQuality);
 
   if (mode === 'full-scale') {
     return (
       <div className="space-y-3 text-center">
-        <p className="text-sm text-muted-foreground">{data.scaleName} — {isBb ? data.trumpetChordSymbol : data.concertChordSymbol}</p>
+        <p className="text-sm text-muted-foreground">
+          {data.scaleName} — {getChordSymbol((semitoneOffset ? transposeNote(item.root, semitoneOffset) : item.root) as Root, def.chordQuality)}
+        </p>
         <NoteRow notes={notes} degrees={data.scaleDegrees} />
       </div>
     );
@@ -454,7 +565,9 @@ function StandardBack({ item, mode, sequence, isBb }: {
   if (mode === 'full-chord') {
     return (
       <div className="space-y-3 text-center">
-        <p className="text-sm text-muted-foreground">{isBb ? data.trumpetChordSymbol : data.concertChordSymbol}</p>
+        <p className="text-sm text-muted-foreground">
+          {getChordSymbol((semitoneOffset ? transposeNote(item.root, semitoneOffset) : item.root) as Root, def.chordQuality)}
+        </p>
         <NoteRow notes={chordTones} degrees={data.chordDegrees} />
       </div>
     );
@@ -474,16 +587,28 @@ function StandardBack({ item, mode, sequence, isBb }: {
   );
 }
 
-function TwoFiveOneFront({ item, isBb, tr }: { item: TwoFiveOneItem; isBb: boolean; tr: Tr }) {
+function TwoFiveOneFront({ item, semitoneOffset, tr }: { item: TwoFiveOneItem; semitoneOffset: number; tr: Tr }) {
   const iiData = getScaleData(item.combo.ii.root, item.combo.ii.scaleType);
-  const vData  = getScaleData(item.combo.V.root, item.combo.V.scaleType);
-  const iData  = getScaleData(item.combo.I.root, item.combo.I.scaleType);
+  const vData = getScaleData(item.combo.V.root, item.combo.V.scaleType);
+  const iData = getScaleData(item.combo.I.root, item.combo.I.scaleType);
 
-  const iiSymbol = isBb ? iiData.trumpetChordSymbol : iiData.concertChordSymbol;
-  const vSymbol  = isBb ? vData.trumpetChordSymbol  : vData.concertChordSymbol;
-  const iSymbol  = isBb ? iData.trumpetChordSymbol  : iData.concertChordSymbol;
+  const iiSymbol =
+    semitoneOffset === 0 ? iiData.concertChordSymbol :
+    semitoneOffset === BB_OFFSET ? iiData.trumpetChordSymbol :
+    getChordSymbol(transposeNote(item.combo.ii.root, semitoneOffset), getScaleDefinition(item.combo.ii.scaleType).chordQuality);
+  const vSymbol =
+    semitoneOffset === 0 ? vData.concertChordSymbol :
+    semitoneOffset === BB_OFFSET ? vData.trumpetChordSymbol :
+    getChordSymbol(transposeNote(item.combo.V.root, semitoneOffset), getScaleDefinition(item.combo.V.scaleType).chordQuality);
+  const iSymbol =
+    semitoneOffset === 0 ? iData.concertChordSymbol :
+    semitoneOffset === BB_OFFSET ? iData.trumpetChordSymbol :
+    getChordSymbol(transposeNote(item.combo.I.root, semitoneOffset), getScaleDefinition(item.combo.I.scaleType).chordQuality);
 
-  const displayKey = isBb ? iiData.trumpetNotes[0] : item.key;
+  const displayKey =
+    semitoneOffset === 0 ? item.key :
+    semitoneOffset === BB_OFFSET ? iiData.trumpetNotes[0] :
+    transposeNote(item.key, semitoneOffset);
 
   return (
     <div className="text-center space-y-4">
@@ -503,7 +628,7 @@ function TwoFiveOneFront({ item, isBb, tr }: { item: TwoFiveOneItem; isBb: boole
   );
 }
 
-function TwoFiveOneBack({ item, isBb }: { item: TwoFiveOneItem; isBb: boolean }) {
+function TwoFiveOneBack({ item, semitoneOffset }: { item: TwoFiveOneItem; semitoneOffset: number }) {
   const chords = [
     { label: 'ii', data: getScaleData(item.combo.ii.root, item.combo.ii.scaleType) },
     { label: 'V',  data: getScaleData(item.combo.V.root, item.combo.V.scaleType) },
@@ -512,9 +637,18 @@ function TwoFiveOneBack({ item, isBb }: { item: TwoFiveOneItem; isBb: boolean })
 
   return (
     <div className="space-y-6">
-      {chords.map(({ label, data }) => {
-        const symbol = isBb ? data.trumpetChordSymbol : data.concertChordSymbol;
-        const tones  = isBb ? data.trumpetChordTones  : data.concertChordTones;
+      {chords.map(({ label, data }, idx) => {
+        const root = (idx === 0 ? item.combo.ii.root : idx === 1 ? item.combo.V.root : item.combo.I.root);
+        const scaleType = (idx === 0 ? item.combo.ii.scaleType : idx === 1 ? item.combo.V.scaleType : item.combo.I.scaleType);
+        const def = getScaleDefinition(scaleType);
+        const symbol =
+          semitoneOffset === 0 ? data.concertChordSymbol :
+          semitoneOffset === BB_OFFSET ? data.trumpetChordSymbol :
+          getChordSymbol(transposeNote(root, semitoneOffset), def.chordQuality);
+        const tones =
+          semitoneOffset === 0 ? data.concertChordTones :
+          semitoneOffset === BB_OFFSET ? data.trumpetChordTones :
+          getChordTones(transposeNote(root, semitoneOffset), def.chordQuality);
         return (
           <div key={label} className="text-center space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
@@ -527,8 +661,8 @@ function TwoFiveOneBack({ item, isBb }: { item: TwoFiveOneItem; isBb: boolean })
   );
 }
 
-function IntervalFront({ item, isBb, tr }: { item: IntervalItem; isBb: boolean; tr: Tr }) {
-  const displayRoot = isBb ? transposeNote(item.root, 2) : item.root;
+function IntervalFront({ item, semitoneOffset, tr }: { item: IntervalItem; semitoneOffset: number; tr: Tr }) {
+  const displayRoot = semitoneOffset ? transposeNote(item.root, semitoneOffset) : item.root;
   return (
     <div className="text-center space-y-4">
       <p className="text-sm text-muted-foreground uppercase tracking-widest">{tr.labelInterval}</p>
@@ -543,9 +677,9 @@ function IntervalFront({ item, isBb, tr }: { item: IntervalItem; isBb: boolean; 
   );
 }
 
-function IntervalBack({ item, isBb }: { item: IntervalItem; isBb: boolean }) {
-  const displayRoot = isBb ? transposeNote(item.root, 2) : item.root;
-  const displayAnswer = isBb ? transposeNote(item.answer, 2) : item.answer;
+function IntervalBack({ item, semitoneOffset }: { item: IntervalItem; semitoneOffset: number }) {
+  const displayRoot = semitoneOffset ? transposeNote(item.root, semitoneOffset) : item.root;
+  const displayAnswer = semitoneOffset ? transposeNote(item.answer, semitoneOffset) : item.answer;
   return (
     <div className="text-center space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -670,6 +804,7 @@ export default function PracticeModePage() {
 
   const [authed, setAuthed] = useState(false);
   const [ensured, setEnsured] = useState(false);
+  const [ensureError, setEnsureError] = useState<string | null>(null);
 
   // Config — always starts null; all modes show the config screen first
   const [config, setConfig] = useState<PracticeConfig | null>(null);
@@ -688,17 +823,33 @@ export default function PracticeModePage() {
   const [chordPlayMode, setChordPlayModeState] = useState<ChordPlayMode>(() => getChordPlayMode());
   const [playing, setPlaying] = useState(false);
   const [expectedNotes, setExpectedNotes] = useState<string[]>([]);
-  const [variantMeta, setVariantMeta] = useState<{ direction?: 'up' | 'down'; inversion?: number; inversionBass?: string }>({});
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionXp, setSessionXp] = useState(0);
+  const [lastEarnedXp, setLastEarnedXp] = useState<number | null>(null);
+  const clearLastXpTimerRef = useRef<number | null>(null);
 
-  const { isBb, toggle: toggleBb } = useBb();
+  const { pitch, cycle: cyclePitch } = usePitch();
+  const semitoneOffset = pitch === 'bb' ? BB_OFFSET : pitch === 'eb' ? EB_OFFSET : 0;
   const { lang } = useLanguage();
   const tr = t(lang);
-  const { data: dueCards, isLoading: loadingDue } = useDueCards();
-  const { data: allCards, isLoading: loadingAll } = useAllCards();
-  const invalidate = useInvalidateCards();
+  const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
+  const gameSlug = (
+    dbMode === 'full_scale' ? 'full_scale' :
+    dbMode === 'full_chord' ? 'full_chord' :
+    dbMode === 'sequence' ? 'sequence' :
+    dbMode === '251' ? 'progression_251' :
+    dbMode === 'interval' ? 'interval' :
+    'full_scale'
+  );
+  const shouldUseWeights = dbMode === 'full_scale' || dbMode === 'full_chord' || dbMode === 'sequence';
+  const { data: adaptiveWeights, isLoading: loadingWeights } = useAdaptiveWeights(gameSlug);
+  const { data: dueItems, isLoading: loadingDue } = useDueGameItems(gameSlug);
+  const { data: allItems, isLoading: loadingAll } = useAllGameItems(gameSlug);
+  const invalidate = useInvalidateGameItems();
   const sessionIdRef = useRef<string | null>(null);
   const reviewedCountRef = useRef(0);
   const correctCountRef = useRef(0);
+  const lastActivityAtRef = useRef<number>(Date.now());
   /** Only rebuild deck + reset index when mode/config change — not when dueCards/allCards refetch after invalidate(). */
   const deckBuildKeyRef = useRef<string | null>(null);
   const sessionSeedRef = useRef<string>('seed');
@@ -711,33 +862,47 @@ export default function PracticeModePage() {
     });
   }, [router]);
 
-  // Ensure 204 cards exist (once per session)
+  // Ensure games/items/state exist (once per session)
   useEffect(() => {
     if (!authed || ensured) return;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return;
-      await fetch('/api/cards/ensure', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      setEnsured(true);
-      invalidate();
-    });
-  }, [authed, ensured, invalidate]);
+      setEnsureError(null);
+      const headers = { Authorization: `Bearer ${session.access_token}` };
 
-  // Build deck once cards + config are ready (new session only — not on query refetch after grading)
+      async function mustPost(url: string) {
+        const res = await fetch(url, { method: 'POST', headers });
+        if (res.ok) return;
+        const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
+        throw new Error(body.detail ?? body.error ?? `${url} failed (${res.status})`);
+      }
+
+      try {
+        await mustPost('/api/games/ensure');
+        await mustPost('/api/game-items/ensure');
+        await mustPost('/api/user-game-item-state/ensure');
+      } catch (e) {
+        setEnsureError(e instanceof Error ? e.message : 'Failed to set up practice items');
+        return;
+      }
+      setEnsured(true);
+      invalidate(gameSlug);
+    });
+  }, [authed, ensured, invalidate, gameSlug]);
+
+  // Build deck once game items + config are ready (new session only — not on query refetch after grading)
   useEffect(() => {
-    if (!ensured || loadingDue || loadingAll || !dueCards || !allCards) return;
+    if (!ensured || loadingDue || loadingAll || (shouldUseWeights && loadingWeights) || !dueItems || !allItems) return;
     if (!config) {
       deckBuildKeyRef.current = null;
       return;
     }
-    const buildKey = `${practiceMode}:${JSON.stringify(config)}`;
+    const buildKey = `${practiceMode}:${JSON.stringify(config)}:${shouldUseWeights ? Object.keys(adaptiveWeights ?? {}).length : 'no-weights'}`;
     if (deckBuildKeyRef.current === buildKey) return;
 
     deckBuildKeyRef.current = buildKey;
     sessionSeedRef.current = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const { deck: built, isCram: cram } = buildDeck(practiceMode, dueCards, allCards, config);
+    const { deck: built, isCram: cram } = buildDeck(practiceMode, dueItems, allItems, config, shouldUseWeights ? (adaptiveWeights ?? null) : null);
     setDeck(built);
     setIsCram(cram);
     setIndex(0);
@@ -747,27 +912,43 @@ export default function PracticeModePage() {
     setScore(null);
     reviewedCountRef.current = 0;
     correctCountRef.current = 0;
-  }, [ensured, loadingDue, loadingAll, dueCards, allCards, practiceMode, config]);
+    setSessionXp(0);
+    setLastEarnedXp(null);
+    if (clearLastXpTimerRef.current) {
+      window.clearTimeout(clearLastXpTimerRef.current);
+      clearLastXpTimerRef.current = null;
+    }
+    setSessionExpired(false);
+  }, [ensured, loadingDue, loadingAll, loadingWeights, shouldUseWeights, dueItems, allItems, practiceMode, config, adaptiveWeights]);
 
   // Create practice session when deck is ready
   useEffect(() => {
     if (deck.length === 0 || sessionIdRef.current || !config) return;
     const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
+    const gameSlug = DB_MODE_TO_GAME_SLUG[dbMode] ?? 'full_scale';
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return;
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          practice_mode: dbMode,
+          game_slug: gameSlug,
           is_cram: isCram,
-          root: config.type === 'root-selected' ? config.roots.join(',') : null,
-          sequence_count: practiceMode === 'sequence' ? config.sequenceCount : null,
+          config: {
+            mode: dbMode,
+            root_mode: config.type,
+            roots: config.type === 'root-selected' ? config.roots : null,
+            sequence_count: practiceMode === 'sequence' ? config.sequenceCount : null,
+            scale_direction: config.scaleDirection,
+            chord_inversions: config.chordInversions,
+          },
         }),
       });
       if (res.ok) {
         const body = await res.json() as { session: { id: string } };
         sessionIdRef.current = body.session.id;
+        lastActivityAtRef.current = Date.now();
+        setSessionExpired(false);
       }
     });
   }, [deck.length, practiceMode, isCram, config]);
@@ -783,12 +964,60 @@ export default function PracticeModePage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           ended_at: new Date().toISOString(),
-          cards_reviewed: reviewedCountRef.current,
+          items_completed: reviewedCountRef.current,
           correct_count: correctCountRef.current,
+          status: 'completed',
         }),
       });
     });
   }, [done]);
+
+  // Track interaction timestamps while a session is active.
+  useEffect(() => {
+    if (!sessionIdRef.current || done || sessionExpired) return;
+
+    const markActivity = () => {
+      lastActivityAtRef.current = Date.now();
+    };
+
+    const events: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'focus'];
+    events.forEach((name) => window.addEventListener(name, markActivity, { passive: true }));
+
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, markActivity));
+    };
+  }, [done, sessionExpired, deck.length]);
+
+  // Auto-close inactive sessions after 30 minutes.
+  useEffect(() => {
+    if (!sessionIdRef.current || done || sessionExpired) return;
+
+    const timer = window.setInterval(() => {
+      if (Date.now() - lastActivityAtRef.current < SESSION_TIMEOUT_MS) return;
+
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+
+      setSessionExpired(true);
+      setDone(true);
+
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session) return;
+        await fetch(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            ended_at: new Date().toISOString(),
+            items_completed: reviewedCountRef.current,
+            correct_count: correctCountRef.current,
+            status: 'abandoned',
+          }),
+        });
+      });
+    }, 1_000);
+
+    return () => window.clearInterval(timer);
+  }, [done, sessionExpired]);
 
   // Generate sequence for current card
   useEffect(() => {
@@ -796,7 +1025,7 @@ export default function PracticeModePage() {
     const item = deck[index];
     if (!item) return;
     if (item.type === 'standard') {
-      setSequence(generateSequence(item.card.scale_type, config?.sequenceCount ?? 5));
+      if (item.kind !== 'chord') setSequence(generateSequence(item.scaleType, config?.sequenceCount ?? 5));
     }
   }, [index, deck, practiceMode, config]);
 
@@ -805,32 +1034,26 @@ export default function PracticeModePage() {
     const item = deck[index];
     if (!item || !config) {
       setExpectedNotes([]);
-      setVariantMeta({});
       return;
     }
     const seed =
       item.type === 'standard'
-        ? `${sessionSeedRef.current}:${item.card.id}`
+        ? `${sessionSeedRef.current}:${item.canonicalKey}`
         : item.type === 'interval'
-          ? `${sessionSeedRef.current}:${item.root}:${item.intervalId}:${item.direction}`
-          : `${sessionSeedRef.current}:${item.key}:${item.tonality}`;
+          ? `${sessionSeedRef.current}:${item.canonicalKey}`
+          : `${sessionSeedRef.current}:${item.canonicalKey}`;
     const resolved = resolveExpectedNotesWithVariants({
       item,
       mode: practiceMode,
       sequence,
-      isBb,
+      semitoneOffset,
       scaleDirection: config.scaleDirection,
       chordInversions: config.chordInversions,
       seed,
     });
     setExpectedNotes(resolved.expected);
-    setVariantMeta({
-      ...(resolved.direction ? { direction: resolved.direction } : {}),
-      ...(typeof resolved.inversion === 'number' ? { inversion: resolved.inversion } : {}),
-      ...(resolved.inversionBass ? { inversionBass: resolved.inversionBass } : {}),
-    });
     setUserAnswerTokens((prev) => Array.from({ length: resolved.expected.length }, (_, i) => prev[i] ?? ''));
-  }, [deck, index, practiceMode, sequence, isBb, config]);
+  }, [deck, index, practiceMode, sequence, semitoneOffset, config]);
 
   // Keyboard shortcuts
   const handleGradeRef = useRef<((g: Grade) => void) | null>(null);
@@ -864,7 +1087,7 @@ export default function PracticeModePage() {
       if (practiceMode === 'sequence') {
         const nextItem = deck[next];
         if (nextItem?.type === 'standard') {
-          setSequence(generateSequence(nextItem.card.scale_type));
+          if (nextItem.kind !== 'chord') setSequence(generateSequence(nextItem.scaleType));
         }
       }
     }
@@ -894,6 +1117,14 @@ export default function PracticeModePage() {
     sessionIdRef.current = null;
     reviewedCountRef.current = 0;
     correctCountRef.current = 0;
+    setSessionXp(0);
+    setLastEarnedXp(null);
+    if (clearLastXpTimerRef.current) {
+      window.clearTimeout(clearLastXpTimerRef.current);
+      clearLastXpTimerRef.current = null;
+    }
+    lastActivityAtRef.current = Date.now();
+    setSessionExpired(false);
     setConfig(null); // always return to config screen
   }, []);
 
@@ -903,30 +1134,34 @@ export default function PracticeModePage() {
     if (!item) return;
     setGrading(true);
     setGradeError(null);
+    lastActivityAtRef.current = Date.now();
     try {
       const sid = sessionIdRef.current ?? undefined;
       const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
       if (item.type === 'standard') {
-        await gradeCard(item.card.id, grade, sid, dbMode, isCram);
+        await gradeCard(item.gameItemId, grade, sid, dbMode, isCram, { canonical_key: item.canonicalKey });
       } else if (item.type === '251') {
-        await Promise.all([
-          gradeCard(item.cards.ii.id, grade, sid, dbMode, isCram),
-          gradeCard(item.cards.V.id, grade, sid, dbMode, isCram),
-          gradeCard(item.cards.I.id, grade, sid, dbMode, isCram),
-        ]);
+        const meta = { progression: '251', key: item.key, tonality: item.tonality, canonical_key: item.canonicalKey };
+        await gradeCard(item.gameItemId, grade, sid, dbMode, isCram, meta);
       } else if (item.type === 'interval') {
-        await gradeInterval(grade, sid, item.root);
+        const meta = { root: item.root, interval_id: item.intervalId, direction: item.direction, canonical_key: item.canonicalKey };
+        await gradeCard(item.gameItemId, grade, sid, dbMode, isCram, meta);
       }
+      const earned = getEventXp({ grade, is_correct: grade >= 3 });
+      setSessionXp((prev) => prev + earned);
+      setLastEarnedXp(earned);
+      if (clearLastXpTimerRef.current) window.clearTimeout(clearLastXpTimerRef.current);
+      clearLastXpTimerRef.current = window.setTimeout(() => setLastEarnedXp(null), 1200);
       reviewedCountRef.current += 1;
       if (grade >= 3) correctCountRef.current += 1;
-      invalidate();
+      invalidate(gameSlug);
       advanceCard(index + 1);
     } catch (err) {
       setGradeError(err instanceof Error ? err.message : 'Grade failed');
     } finally {
       setGrading(false);
     }
-  }, [grading, deck, index, invalidate, advanceCard, practiceMode, isCram]);
+  }, [grading, deck, index, invalidate, advanceCard, practiceMode, isCram, gameSlug]);
 
   // Auto-grade using scoreAnswer's suggestedGrade, then advance.
   // Blank answer → grade 1 (Blackout). Used by the nav Next button.
@@ -960,10 +1195,10 @@ export default function PracticeModePage() {
   handleGradeRef.current = handleGrade;
   handleNextRef.current = handleNext;
 
-  const cardsLoading = !authed || !ensured || loadingDue || loadingAll;
-  // Config screen shows for all modes while no config selected (cards load in background)
+  const itemsLoading = !authed || !ensured || loadingDue || loadingAll;
+  // Config screen shows for all modes while no config selected (items load in background)
   const showConfig = authed && ensured && !config;
-  const loading = cardsLoading && !showConfig;
+  const loading = itemsLoading && !showConfig;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -990,16 +1225,16 @@ export default function PracticeModePage() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={toggleBb}
+              onClick={cyclePitch}
               className={cn(
                 'rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
-                isBb
+                pitch !== 'concert'
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground',
               )}
-              title={isBb ? tr.pitchTooltipBb : tr.pitchTooltipConcert}
+              title={pitch === 'bb' ? tr.pitchTooltipBb : pitch === 'eb' ? tr.pitchTooltipEb : tr.pitchTooltipConcert}
             >
-              {isBb ? 'Bb' : tr.pitchConcert}
+              {pitch === 'bb' ? tr.pitchBb : pitch === 'eb' ? tr.pitchEb : tr.pitchConcert}
             </button>
             <Button
               variant="outline"
@@ -1014,11 +1249,19 @@ export default function PracticeModePage() {
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto p-4 sm:justify-center sm:gap-6 sm:p-6">
           {loading ? (
-            <LoadingSkeleton />
+            <LoadingSkeleton tr={tr} />
+          ) : ensureError ? (
+            <div className="w-full max-w-lg space-y-3 rounded-xl border bg-card p-6 text-center shadow-sm">
+              <p className="text-lg font-semibold">Setup failed</p>
+              <p className="text-sm text-muted-foreground">{ensureError}</p>
+              <Button variant="outline" onClick={() => { setEnsured(false); setEnsureError(null); }}>
+                Retry
+              </Button>
+            </div>
           ) : showConfig ? (
             <ConfigScreen mode={practiceMode} onSelect={setConfig} tr={tr} />
           ) : done ? (
-            <DoneScreen total={deck.length} isCram={isCram} config={config} onNewSession={handleNewSession} tr={tr} />
+            <DoneScreen total={deck.length} isCram={isCram} config={config} expired={sessionExpired} onNewSession={handleNewSession} tr={tr} />
           ) : deck.length === 0 ? (
             <EmptyDeck />
           ) : (
@@ -1026,16 +1269,17 @@ export default function PracticeModePage() {
               item={deck[index]!}
               mode={practiceMode}
               sequence={sequence}
-              isBb={isBb}
+              semitoneOffset={semitoneOffset}
               flipped={flipped}
               grading={grading}
               current={index + 1}
               total={deck.length}
               isCram={isCram}
+              sessionXp={sessionXp}
+              lastEarnedXp={lastEarnedXp}
               config={config}
               userAnswerTokens={userAnswerTokens}
               expectedNotes={expectedNotes}
-              variantMeta={variantMeta}
               score={score}
               gradeError={gradeError}
               onAnswerChange={setUserAnswerTokens}
@@ -1066,16 +1310,17 @@ function PracticeCard({
   item,
   mode,
   sequence,
-  isBb,
+  semitoneOffset,
   flipped,
   grading,
   current,
   total,
   isCram,
+  sessionXp,
+  lastEarnedXp,
   config,
   userAnswerTokens,
   expectedNotes,
-  variantMeta,
   score,
   gradeError,
   onAnswerChange,
@@ -1092,16 +1337,17 @@ function PracticeCard({
   item: DeckItem;
   mode: PracticeMode;
   sequence: string[];
-  isBb: boolean;
+  semitoneOffset: number;
   flipped: boolean;
   grading: boolean;
   current: number;
   total: number;
   isCram: boolean;
+  sessionXp: number;
+  lastEarnedXp: number | null;
   config: PracticeConfig | null;
   userAnswerTokens: string[];
   expectedNotes: string[];
-  variantMeta: { direction?: 'up' | 'down'; inversion?: number; inversionBass?: string };
   score: AnswerScore | null;
   gradeError: string | null;
   onAnswerChange: (v: string[]) => void;
@@ -1138,6 +1384,14 @@ function PracticeCard({
           )}
           {isCram && (
             <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs">{tr.cramBadge}</span>
+          )}
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs tabular-nums">
+            XP {sessionXp}
+          </span>
+          {lastEarnedXp != null && (
+            <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 text-xs font-semibold tabular-nums">
+              +{lastEarnedXp} XP
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1194,11 +1448,11 @@ function PracticeCard({
       {/* Prompt card */}
       <div className="min-h-52 rounded-xl border bg-card p-8 shadow-sm flex items-center justify-center">
         {item.type === 'standard' ? (
-          <StandardFront item={item} mode={mode} sequence={sequence} isBb={isBb} tr={tr} inversionBass={variantMeta.inversionBass} />
+          <StandardFront item={item} mode={mode} sequence={sequence} semitoneOffset={semitoneOffset} tr={tr} />
         ) : item.type === 'interval' ? (
-          <IntervalFront item={item} isBb={isBb} tr={tr} />
+          <IntervalFront item={item} semitoneOffset={semitoneOffset} tr={tr} />
         ) : (
-          <TwoFiveOneFront item={item} isBb={isBb} tr={tr} />
+          <TwoFiveOneFront item={item} semitoneOffset={semitoneOffset} tr={tr} />
         )}
       </div>
 
@@ -1225,11 +1479,11 @@ function PracticeCard({
             {tr.correctAnswer}
           </p>
           {item.type === 'standard' ? (
-            <StandardBack item={item} mode={mode} sequence={sequence} isBb={isBb} />
+            <StandardBack item={item} mode={mode} sequence={sequence} semitoneOffset={semitoneOffset} />
           ) : item.type === 'interval' ? (
-            <IntervalBack item={item} isBb={isBb} />
+            <IntervalBack item={item} semitoneOffset={semitoneOffset} />
           ) : (
-            <TwoFiveOneBack item={item} isBb={isBb} />
+            <TwoFiveOneBack item={item} semitoneOffset={semitoneOffset} />
           )}
         </div>
       )}
@@ -1548,9 +1802,13 @@ function ConfigScreen({ mode, onSelect, tr }: { mode: PracticeMode; onSelect: (c
   );
 }
 
-function LoadingSkeleton() {
+function LoadingSkeleton({ tr }: { tr: Tr }) {
   return (
     <div className="w-full max-w-2xl space-y-6">
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <span>{tr.loadingPracticeContent}</span>
+      </div>
       <div className="flex justify-between">
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-4 w-32" />
@@ -1567,16 +1825,20 @@ function DoneScreen({
   total,
   isCram,
   config,
+  expired,
   onNewSession,
   tr,
 }: {
   total: number;
   isCram: boolean;
   config: PracticeConfig | null;
+  expired?: boolean;
   onNewSession: () => void;
   tr: Tr;
 }) {
-  const subtitle = config?.type === 'root-selected'
+  const subtitle = expired
+    ? tr.sessionExpiredMessage
+    : config?.type === 'root-selected'
     ? (config.roots.length === 1
         ? tr.doneRootSelected(total, config.roots[0] ?? '')
         : tr.doneRootsSelected(total, config.roots.join(' ')))
@@ -1606,9 +1868,9 @@ function DoneScreen({
 function EmptyDeck() {
   return (
     <div className="text-center space-y-4">
-      <p className="text-2xl">No cards found</p>
+      <p className="text-2xl">No practice items found</p>
       <p className="text-muted-foreground text-sm">
-        Cards are still being set up. Try again in a moment.
+        Practice items are still being set up. Try again in a moment.
       </p>
       <Link href="/practice" className={buttonVariants({ variant: 'outline' })}>Go back</Link>
     </div>

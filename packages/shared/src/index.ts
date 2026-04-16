@@ -5,7 +5,7 @@ export { SCALE_DEFINITIONS, SCALE_MAP, getScaleDefinition } from './constants/sc
 
 // Theory
 export { applyIntervals, getScaleData } from './theory/TheoryMapper';
-export { transposeNote, transposeNotes, BB_OFFSET } from './theory/transpose';
+export { transposeNote, transposeNotes, BB_OFFSET, EB_OFFSET } from './theory/transpose';
 export {
   CHORD_TONE_INTERVALS,
   CHORD_TONE_DEGREES,

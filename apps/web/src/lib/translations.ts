@@ -3,7 +3,8 @@ import type { Lang } from '@/hooks/use-language';
 type TranslationMap = {
   appName: string;
   appSubtitle: string; navDashboard: string; navPractice: string; navScales: string;
-  navChords: string; signOut: string;
+  navChords: string; navLibrary: string; navSettings: string; signOut: string;
+  navSectionLabel: string;
 
   authLoginTitle: string;
   authLoginSubtitle: string;
@@ -30,10 +31,15 @@ type TranslationMap = {
   authPasswordMinLength: string;
   authImageAlt: string;
 
-  welcomeBack: string; welcomeSub: string;
+  welcomeBack: string; welcomeSub: string; quickStart: string;
   statDueToday: string; statDueSub: string; statStreak: string; statStreakSub: string;
   statMastered: string; statMasteredSub: string; statModes: string; statModesSub: string;
   startPractice: string; browseScales: string; browseChords: string; yourLibrary: string; libraryDesc: string;
+  loadingPracticeContent: string;
+  recentSessions: string; recentSessionsEmpty: string; sessionStatusCompleted: string; sessionStatusAbandoned: string; sessionStatusActive: string;
+  sessionAccuracy: string; sessionItems: string; sessionStarted: string; sessionCram: string;
+  weeklyProgress: string; weeklyProgressSub: string; weeklySessions: string; weeklyItemsCompleted: string; weeklyAverageAccuracy: string; weeklyNoActivity: string;
+  statXp: string; statXpSub: string; weeklyXp: string; sessionXp: string;
   practiceTitle: string; practiceSubtitle: string; modeStart: string;
   modeFullScale: string; modeFullScaleDesc: string; modeFullChord: string; modeFullChordDesc: string;
   modeSequence: string; modeSequenceDesc: string; mode251: string; mode251Desc: string;
@@ -49,6 +55,7 @@ type TranslationMap = {
   chordPlaybackBlock: string;
   chordPlaybackArpeggio: string;
   cramBadge: string;
+  sessionExpiredMessage: string;
   grade1Label: string; grade1Desc: string; grade2Label: string; grade2Desc: string;
   grade3Label: string; grade3Desc: string; grade4Label: string; grade4Desc: string;
   doneTitle: string;
@@ -59,8 +66,17 @@ type TranslationMap = {
   newSession: string; backToModes: string;
 
   pitchConcert: string;
+  pitchBb: string;
+  pitchEb: string;
   pitchTooltipBb: string;
+  pitchTooltipEb: string;
   pitchTooltipConcert: string;
+
+  settingsTitle: string;
+  settingsSubtitle: string;
+  settingsPitchLabel: string;
+  settingsPitchHelp: string;
+  settingsSaved: string;
 
   configDirection: string;
   dirUp: string;
@@ -94,11 +110,14 @@ type TranslationMap = {
 const en: TranslationMap = {
   // ── Sidebar ──────────────────────────────────────────────────────────────
   appName:            'The Shed',
-  appSubtitle:        'Jazz Flashcards',
+  appSubtitle:        'Jazz Practice',
   navDashboard:       'Dashboard',
   navPractice:        'Practice',
+  navLibrary:         'Library',
   navScales:          'Scales',
   navChords:          'Chords',
+  navSettings:        'Preferences',
+  navSectionLabel:    'Navigation',
   signOut:            'Sign out',
 
   authLoginTitle:        'Login to your account',
@@ -128,20 +147,41 @@ const en: TranslationMap = {
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        'Welcome back',
-  welcomeSub:         'Keep the woodshed going — your cards are waiting.',
+  welcomeSub:         'Keep the woodshed going — your next practice items are ready.',
+  quickStart:         'Quick Start',
   statDueToday:       'Due Today',
-  statDueSub:         'cards ready for review',
+  statDueSub:         'items ready for review',
   statStreak:         'Streak',
   statStreakSub:      'days in a row',
   statMastered:       'Mastered',
-  statMasteredSub:    'of 204 cards',
+  statMasteredSub:    'game items mastered',
   statModes:          'Practice Modes',
   statModesSub:       'Scale · Chord · Seq · 251',
   startPractice:      'Start Practice',
   browseScales:       'Browse Scales',
   browseChords:       'Browse Chords',
+  loadingPracticeContent: 'Loading Practice Content...',
   yourLibrary:        'Your Library',
-  libraryDesc:        '204 cards — 17 scale types × 12 roots, across five practice modes. Cards are reviewed using SM-2 spaced repetition so you spend more time on what needs work.',
+  libraryDesc:        'A game-based jazz practice library across scales, chords, sequences, 2-5-1, and intervals, with adaptive review driven by your performance.',
+  recentSessions:     'Recent Sessions',
+  recentSessionsEmpty:'No sessions yet. Start practicing to build your history.',
+  sessionStatusCompleted: 'Completed',
+  sessionStatusAbandoned: 'Expired',
+  sessionStatusActive: 'Active',
+  sessionAccuracy:    'Accuracy',
+  sessionItems:       'Items',
+  sessionStarted:     'Started',
+  sessionCram:        'Cram',
+  weeklyProgress:     'Last 7 Days',
+  weeklyProgressSub:  'Your recent practice activity and consistency.',
+  weeklySessions:     'Sessions',
+  weeklyItemsCompleted:'Items completed',
+  weeklyAverageAccuracy:'Avg accuracy',
+  weeklyNoActivity:   'No practice activity in the last 7 days yet.',
+  statXp:             'Total XP',
+  statXpSub:          'earned from graded practice',
+  weeklyXp:           'XP earned',
+  sessionXp:          'XP',
 
   // ── Practice selector ────────────────────────────────────────────────────
   practiceTitle:      'Practice',
@@ -162,7 +202,7 @@ const en: TranslationMap = {
   configTitle:        'How do you want to practice?',
   configNoteCount:    'Notes per question',
   configRootFree:     'Root Free',
-  configRootFreeDesc: 'Random cards from your due queue — up to 20 per session.',
+  configRootFreeDesc: 'Random due items from your queue — up to 20 per session.',
   configPickRoot:     'Or pick a root',
   rootLabel251:       'ii-V-I in this key',
   rootLabelInterval:  'all intervals from this root',
@@ -193,6 +233,7 @@ const en: TranslationMap = {
   chordPlaybackBlock: 'Block',
   chordPlaybackArpeggio: 'Up–Down',
   cramBadge:          'Cram',
+  sessionExpiredMessage: 'This session expired after 30 minutes of inactivity.',
 
   // ── Grades ───────────────────────────────────────────────────────────────
   grade1Label:        'Blackout',
@@ -208,14 +249,23 @@ const en: TranslationMap = {
   doneTitle:          'Done',
   doneRootSelected:   (n: number, root: string) => `${n} questions — root: ${root}`,
   doneRootsSelected:  (n: number, roots: string) => `${n} questions — roots: ${roots}`,
-  doneCram:           (n: number) => `Cranked through ${n} cards.`,
-  doneFree:           (n: number) => `Reviewed ${n} due card${n !== 1 ? 's' : ''}.`,
+  doneCram:           (n: number) => `Cranked through ${n} items.`,
+  doneFree:           (n: number) => `Reviewed ${n} due item${n !== 1 ? 's' : ''}.`,
   newSession:         'New Session',
   backToModes:        'Back to modes',
 
   pitchConcert:       'Concert',
-  pitchTooltipBb:     'Showing Bb transposition — click for concert pitch',
-  pitchTooltipConcert:'Showing concert pitch — click for Bb',
+  pitchBb:            'Bb',
+  pitchEb:            'Eb',
+  pitchTooltipBb:     'Showing Bb transposition — click to cycle pitch',
+  pitchTooltipEb:     'Showing Eb transposition — click to cycle pitch',
+  pitchTooltipConcert:'Showing concert pitch — click to cycle pitch',
+
+  settingsTitle:      'Settings',
+  settingsSubtitle:   'Personal preferences for your account.',
+  settingsPitchLabel: 'Instrument key',
+  settingsPitchHelp:  'Sets the default display pitch (you can still switch any time during practice).',
+  settingsSaved:      'Saved.',
 
   configDirection:    'Direction',
   dirUp:              'Up',
@@ -266,11 +316,14 @@ const en: TranslationMap = {
 const zh: TranslationMap = {
   // ── Sidebar ──────────────────────────────────────────────────────────────
   appName:            '爵士乐棚',
-  appSubtitle:        '爵士练习卡',
+  appSubtitle:        '乐理知识练习',
   navDashboard:       '总览',
   navPractice:        '练习',
+  navLibrary:         '曲库',
   navScales:          '音阶',
   navChords:          '和弦',
+  navSettings:        '偏好设置',
+  navSectionLabel:    '导航',
   signOut:            '退出登录',
 
   authLoginTitle:        '登录账号',
@@ -300,20 +353,41 @@ const zh: TranslationMap = {
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        '欢迎回来',
-  welcomeSub:         '继续练习吧，你的卡片在等你。',
+  welcomeSub:         '继续练习吧，下一组练习题已经在等你。',
+  quickStart:         '快速开始',
   statDueToday:       '今日待复习',
-  statDueSub:         '张卡片待复习',
+  statDueSub:         '题待复习',
   statStreak:         '连续天数',
   statStreakSub:      '天连续练习',
   statMastered:       '已掌握',
-  statMasteredSub:    '共 204 张',
+  statMasteredSub:    '已掌握的练习项',
   statModes:          '练习模式',
   statModesSub:       '音阶 · 和弦 · 序列 · 2-5-1',
   startPractice:      '开始练习',
   browseScales:       '查看音阶',
   browseChords:       '查看和弦',
+  loadingPracticeContent: '正在加载练习内容…',
   yourLibrary:        '我的卡库',
-  libraryDesc:        '204 张卡片 — 17 种音阶 × 12 个根音，涵盖五种练习模式。使用 SM-2 间隔重复算法，把时间花在最需要巩固的内容上。',
+  libraryDesc:        '一个基于游戏化结构的爵士练习库，涵盖音阶、和弦、音程序列、2-5-1 与音程，并根据你的表现自适应安排复习。',
+  recentSessions:     '最近练习',
+  recentSessionsEmpty:'还没有练习记录。开始练习后，这里会显示历史记录。',
+  sessionStatusCompleted: '已完成',
+  sessionStatusAbandoned: '已超时',
+  sessionStatusActive: '进行中',
+  sessionAccuracy:    '正确率',
+  sessionItems:       '题数',
+  sessionStarted:     '开始时间',
+  sessionCram:        '强化',
+  weeklyProgress:     '最近 7 天',
+  weeklyProgressSub:  '查看你最近的练习活跃度与稳定性。',
+  weeklySessions:     '练习次数',
+  weeklyItemsCompleted:'完成题数',
+  weeklyAverageAccuracy:'平均正确率',
+  weeklyNoActivity:   '最近 7 天还没有练习记录。',
+  statXp:             '总 XP',
+  statXpSub:          '来自已评分练习',
+  weeklyXp:           '获得 XP',
+  sessionXp:          'XP',
 
   // ── Practice selector ────────────────────────────────────────────────────
   practiceTitle:      '练习',
@@ -334,7 +408,7 @@ const zh: TranslationMap = {
   configTitle:        '选择练习方式',
   configNoteCount:    '每题音符数',
   configRootFree:     '自由练习',
-  configRootFreeDesc: '从待复习卡片中随机抽取，每次最多 20 题。',
+  configRootFreeDesc: '从待复习队列中随机抽取练习项，每次最多 20 题。',
   configPickRoot:     '或选择根音',
   rootLabel251:       '在此调中练习 2-5-1',
   rootLabelInterval:  '从此根音练习所有音程',
@@ -365,6 +439,7 @@ const zh: TranslationMap = {
   chordPlaybackBlock: '和弦',
   chordPlaybackArpeggio: '上下行',
   cramBadge:          '强化',
+  sessionExpiredMessage: '此会话因 30 分钟无操作而自动结束。',
 
   // ── Grades ───────────────────────────────────────────────────────────────
   grade1Label:        '完全忘记',
@@ -380,14 +455,23 @@ const zh: TranslationMap = {
   doneTitle:          '完成',
   doneRootSelected:   (n: number, root: string) => `共 ${n} 题 — 根音：${root}`,
   doneRootsSelected:  (n: number, roots: string) => `共 ${n} 题 — 根音：${roots}`,
-  doneCram:           (n: number) => `强化练习了 ${n} 张卡片。`,
-  doneFree:           (n: number) => `复习了 ${n} 张待复习卡片。`,
+  doneCram:           (n: number) => `强化练习了 ${n} 题。`,
+  doneFree:           (n: number) => `复习了 ${n} 题待复习内容。`,
   newSession:         '新练习',
   backToModes:        '返回模式',
 
   pitchConcert:       '原调',
-  pitchTooltipBb:     '当前为 Bb 移调显示 — 点击切换为原调',
-  pitchTooltipConcert:'当前为原调显示 — 点击切换为 Bb 移调',
+  pitchBb:            'Bb',
+  pitchEb:            'Eb',
+  pitchTooltipBb:     '当前为 Bb 移调显示 — 点击循环切换',
+  pitchTooltipEb:     '当前为 Eb 移调显示 — 点击循环切换',
+  pitchTooltipConcert:'当前为原调显示 — 点击循环切换',
+
+  settingsTitle:      '设置',
+  settingsSubtitle:   '账号的个人偏好设置。',
+  settingsPitchLabel: '乐器调性',
+  settingsPitchHelp:  '设置默认显示调性（练习时仍可随时切换）。',
+  settingsSaved:      '已保存。',
 
   configDirection:    '方向',
   dirUp:              '上行',

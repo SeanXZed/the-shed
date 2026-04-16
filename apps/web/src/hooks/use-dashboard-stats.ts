@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useAllCards } from './use-cards';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase/client';
+import { getTotalXp } from '@/lib/xp';
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -25,24 +27,48 @@ function computeStreak(reviewDates: Set<string>): number {
 }
 
 export function useDashboardStats() {
-  const { data: cards, isLoading } = useAllCards();
+  const { data: rows, isLoading } = useQuery({
+    queryKey: ['dashboard-stats', 'user_game_item_state', 'game_events'],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const [{ data: stateRows, error: stateError }, { data: eventRows, error: eventError }] = await Promise.all([
+        supabase
+          .from('user_game_item_state')
+          .select('next_review,repetitions,last_played_at,mastery'),
+        supabase
+          .from('game_events')
+          .select('grade,is_correct'),
+      ]);
+
+      if (stateError) throw stateError;
+      if (eventError) throw eventError;
+
+      return {
+        stateRows: stateRows ?? [],
+        eventRows: eventRows ?? [],
+      };
+    },
+  });
 
   const stats = useMemo(() => {
-    if (!cards) return null;
+    if (!rows) return null;
+
+    const { stateRows, eventRows } = rows;
 
     const now = new Date();
-    const dueCount = cards.filter(c => new Date(c.next_review) <= now).length;
-    const masteredCount = cards.filter(c => c.repetitions >= 3).length;
+    const dueCount = stateRows.filter(r => r.next_review && new Date(r.next_review) <= now).length;
+    const masteredCount = stateRows.filter(r => (r.mastery ?? 0) >= 0.8 || (r.repetitions ?? 0) >= 3).length;
 
     const reviewDates = new Set(
-      cards
-        .filter(c => c.last_reviewed_at != null)
-        .map(c => toDateStr(new Date(c.last_reviewed_at!))),
+      stateRows
+        .filter(r => r.last_played_at != null)
+        .map(r => toDateStr(new Date(r.last_played_at!))),
     );
     const streak = computeStreak(reviewDates);
+    const totalXp = getTotalXp(eventRows);
 
-    return { dueCount, masteredCount, streak };
-  }, [cards]);
+    return { dueCount, masteredCount, streak, totalXp };
+  }, [rows]);
 
   return { stats, isLoading };
 }

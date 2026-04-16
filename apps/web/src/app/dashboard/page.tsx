@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase/client"
 import { useDashboardStats } from "@/hooks/use-dashboard-stats"
+import { useRecentSessions } from "@/hooks/use-recent-sessions"
+import { useSessionTrend } from "@/hooks/use-session-trend"
 import { AppSidebar } from "@/components/app-sidebar"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,11 +26,23 @@ import {
 import { Music2, Flame, CheckCircle2, Clock } from "lucide-react"
 import { useLanguage } from "@/hooks/use-language"
 import { t } from "@/lib/translations"
+import { cn } from "@/lib/utils"
+
+function formatDateTime(input: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(input))
+}
 
 export default function DashboardPage() {
   const router = useRouter()
   const [authed, setAuthed] = useState(false)
   const { stats, isLoading: statsLoading } = useDashboardStats()
+  const { data: recentSessions, isLoading: sessionsLoading } = useRecentSessions()
+  const { trend, isLoading: trendLoading } = useSessionTrend()
   const { lang } = useLanguage()
   const tr = t(lang)
 
@@ -112,52 +126,178 @@ export default function DashboardPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">{tr.statModes}</CardTitle>
+                <CardTitle className="text-sm font-medium">{tr.statXp}</CardTitle>
                 <Music2 className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">5</div>
-                <p className="text-xs text-muted-foreground">{tr.statModesSub}</p>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-16 mb-1" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.totalXp ?? 0}</div>
+                )}
+                <p className="text-xs text-muted-foreground">{tr.statXpSub}</p>
               </CardContent>
             </Card>
           </div>
 
           {/* CTA */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <Link href="/practice" className={buttonVariants({ size: "lg" })}>
-              <Music2 className="mr-2 size-4" />
-              {tr.startPractice}
-            </Link>
-            <Link href="/scales" className={buttonVariants({ variant: "outline" })}>
-              {tr.browseScales}
-            </Link>
-            <Link href="/chords" className={buttonVariants({ variant: "outline" })}>
-              {tr.browseChords}
-            </Link>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">{tr.quickStart}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Link
+                href="/practice"
+                className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto justify-center")}
+              >
+                <Music2 className="mr-2 size-4" />
+                {tr.startPractice}
+              </Link>
+              <Link
+                href="/scales"
+                className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto justify-center")}
+              >
+                {tr.browseScales}
+              </Link>
+              <Link
+                href="/chords"
+                className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto justify-center")}
+              >
+                {tr.browseChords}
+              </Link>
+            </div>
           </div>
 
-          {/* Scale grid info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{tr.yourLibrary}</CardTitle>
+              <CardTitle className="text-base">{tr.weeklyProgress}</CardTitle>
+              <p className="text-sm text-muted-foreground">{tr.weeklyProgressSub}</p>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">{tr.libraryDesc}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  "Major", "Dorian", "Phrygian", "Lydian", "Mixolydian",
-                  "Aeolian", "Locrian", "Melodic Minor", "Lydian Dominant",
-                  "Altered", "Whole Tone", "Diminished", "Blues",
-                  "Bebop Dominant", "Bebop Major", "Pentatonic Major", "Pentatonic Minor",
-                ].map((scale) => (
-                  <span
-                    key={scale}
-                    className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium"
-                  >
-                    {scale}
-                  </span>
-                ))}
-              </div>
+              {trendLoading ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                  <Skeleton className="h-28 w-full" />
+                </div>
+              ) : !trend || trend.totalSessions === 0 ? (
+                <p className="text-sm text-muted-foreground">{tr.weeklyNoActivity}</p>
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border bg-card/50 p-4">
+                      <p className="text-xs text-muted-foreground">{tr.weeklySessions}</p>
+                      <p className="mt-2 text-2xl font-bold">{trend.totalSessions}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card/50 p-4">
+                      <p className="text-xs text-muted-foreground">{tr.weeklyItemsCompleted}</p>
+                      <p className="mt-2 text-2xl font-bold">{trend.totalItemsCompleted}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card/50 p-4">
+                      <p className="text-xs text-muted-foreground">{tr.weeklyAverageAccuracy}</p>
+                      <p className="mt-2 text-2xl font-bold">{trend.averageAccuracy}%</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-card/50 p-4">
+                    <p className="text-xs text-muted-foreground">{tr.weeklyXp}</p>
+                    <p className="mt-2 text-2xl font-bold">{trend.totalXp}</p>
+                  </div>
+
+                  <div className="flex h-32 items-end gap-3">
+                    {trend.daily.map((day) => {
+                      const barHeight = trend.maxSessions > 0
+                        ? Math.max(12, Math.round((day.sessions / trend.maxSessions) * 100))
+                        : 12
+
+                      return (
+                        <div key={day.date} className="flex flex-1 flex-col items-center gap-2">
+                          <div className="flex h-24 w-full items-end">
+                            <div
+                              className="w-full rounded-md bg-primary/80 transition-all"
+                              style={{ height: `${barHeight}%` }}
+                              title={`${day.label}: ${day.sessions} ${tr.weeklySessions.toLowerCase()}`}
+                            />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs font-medium">{day.sessions}</p>
+                            <p className="text-[11px] text-muted-foreground">{day.label}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{tr.recentSessions}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {sessionsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : !recentSessions || recentSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{tr.recentSessionsEmpty}</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentSessions.map((session) => {
+                    const accuracy = session.items_completed > 0
+                      ? Math.round((session.correct_count / session.items_completed) * 100)
+                      : 0
+
+                    const statusLabel =
+                      session.status === "active"
+                        ? tr.sessionStatusActive
+                        : session.status === "abandoned"
+                          ? tr.sessionStatusAbandoned
+                          : tr.sessionStatusCompleted
+
+                    return (
+                      <div
+                        key={session.id}
+                        className="rounded-lg border bg-card/50 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{session.game_title}</p>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                                {statusLabel}
+                              </span>
+                              {session.is_cram && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                  {tr.sessionCram}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {tr.sessionStarted}: {formatDateTime(session.started_at)}
+                            </p>
+                          </div>
+                          <div className="text-right text-sm">
+                            <p className="font-medium">{accuracy}%</p>
+                            <p className="text-xs text-muted-foreground">{tr.sessionAccuracy}</p>
+                            <p className="mt-2 font-medium">{session.xp} {tr.sessionXp}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{tr.sessionItems}: {session.items_completed}</span>
+                          <span>{session.correct_count} / {session.items_completed}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

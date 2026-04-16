@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { useBb } from '@/hooks/use-bb';
-import { SCALE_DEFINITIONS, ROOTS, getScaleData, type Root } from '@the-shed/shared';
+import { usePitch } from '@/hooks/use-bb';
+import { SCALE_DEFINITIONS, ROOTS, getScaleData, transposeNotes, BB_OFFSET, EB_OFFSET, type Root } from '@the-shed/shared';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,7 +28,8 @@ export default function ScalesPage() {
   const [authed, setAuthed] = useState(false);
   const [search, setSearch] = useState('');
   const [rootFilter, setRootFilter] = useState<Root | null>(null);
-  const { isBb, toggle: toggleBb } = useBb();
+  const { pitch, cycle: cyclePitch } = usePitch();
+  const semitoneOffset = pitch === 'bb' ? BB_OFFSET : pitch === 'eb' ? EB_OFFSET : 0;
   const { lang } = useLanguage();
   const tr = t(lang);
 
@@ -70,15 +71,15 @@ export default function ScalesPage() {
             </BreadcrumbList>
           </Breadcrumb>
           <button
-            onClick={toggleBb}
+            onClick={cyclePitch}
             className={cn(
               'ml-auto rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
-              isBb
+              pitch !== 'concert'
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-background text-muted-foreground hover:text-foreground',
             )}
           >
-            {isBb ? 'Bb' : tr.pitchConcert}
+            {pitch === 'bb' ? tr.pitchBb : pitch === 'eb' ? tr.pitchEb : tr.pitchConcert}
           </button>
         </header>
 
@@ -135,9 +136,13 @@ export default function ScalesPage() {
                       className="border-b last:border-0 hover:bg-muted/30 transition-colors"
                     >
                       <td className="px-4 py-2 font-medium">{def.name}</td>
-                      <td className="px-4 py-2 font-mono">{isBb ? data.trumpetNotes[0] : root}</td>
+                      <td className="px-4 py-2 font-mono">
+                        {semitoneOffset === 0 ? root : semitoneOffset === BB_OFFSET ? data.trumpetNotes[0] : transposeNotes(data.concertNotes, semitoneOffset)[0]}
+                      </td>
                       <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs leading-relaxed">
-                        <div className="text-foreground tracking-wide">{(isBb ? data.trumpetNotes : data.concertNotes).join('  ')}</div>
+                        <div className="text-foreground tracking-wide">
+                          {(semitoneOffset === 0 ? data.concertNotes : semitoneOffset === BB_OFFSET ? data.trumpetNotes : transposeNotes(data.concertNotes, semitoneOffset)).join('  ')}
+                        </div>
                         <div className="text-muted-foreground tracking-wide">{def.degreeLabels.join('  ')}</div>
                       </td>
                     </tr>

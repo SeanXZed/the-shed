@@ -1,6 +1,7 @@
 import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
 
 export const BB_OFFSET = 2; // Concert → Bb: written pitch is 2 semitones higher
+export const EB_OFFSET = 9; // Concert → Eb: written pitch is 9 semitones higher
 
 export function transposeNote(note: string, semitones: number): string {
   return semitoneToNote(noteToSemitone(note) + semitones);

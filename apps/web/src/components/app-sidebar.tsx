@@ -8,9 +8,11 @@ import {
   Music2,
   BookOpen,
   Piano,
+  Settings,
   LogOut,
   ChevronsUpDown,
   Music,
+  ChevronDown,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { useLanguage } from "@/hooks/use-language"
@@ -45,14 +47,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter()
   const { isMobile } = useSidebar()
   const [user, setUser] = useState<User | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(true)
   const { lang, toggle } = useLanguage()
   const tr = t(lang)
 
   const navItems = [
     { title: tr.navDashboard, url: "/dashboard", icon: LayoutDashboard },
     { title: tr.navPractice,  url: "/practice",  icon: Music2 },
-    { title: tr.navScales,    url: "/scales",     icon: BookOpen },
-    { title: tr.navChords,    url: "/chords",     icon: Piano },
   ]
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{tr.navSectionLabel}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
@@ -97,6 +98,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={tr.navLibrary}
+                  onClick={() => setLibraryOpen((v) => !v)}
+                  aria-expanded={libraryOpen}
+                >
+                  <BookOpen />
+                  <span className="flex-1">{tr.navLibrary}</span>
+                  <ChevronDown
+                    className={cn("ml-auto transition-transform", libraryOpen ? "rotate-0" : "-rotate-90")}
+                  />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {libraryOpen && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      render={<a href="/scales" />}
+                      tooltip={tr.navScales}
+                      className="pl-9"
+                    >
+                      <BookOpen />
+                      <span>{tr.navScales}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      render={<a href="/chords" />}
+                      tooltip={tr.navChords}
+                      className="pl-9"
+                    >
+                      <Piano />
+                      <span>{tr.navChords}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -143,6 +183,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 align="end"
                 sideOffset={4}
               >
+                <DropdownMenuItem
+                  onClick={() => router.push("/settings")}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 size-4" />
+                  {tr.navSettings}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
                   <LogOut className="mr-2 size-4" />
                   {tr.signOut}

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { useBb } from '@/hooks/use-bb';
+import { usePitch } from '@/hooks/use-bb';
 import { useLanguage } from '@/hooks/use-language';
 import { t } from '@/lib/translations';
 import {
@@ -14,6 +14,7 @@ import {
   transposeNote,
   transposeNotes,
   BB_OFFSET,
+  EB_OFFSET,
   type Root,
   type ChordQuality,
 } from '@the-shed/shared';
@@ -62,7 +63,8 @@ export default function ChordsPage() {
   const [authed, setAuthed] = useState(false);
   const [qualityFilter, setQualityFilter] = useState<ChordQuality | null>(null);
   const [rootFilter, setRootFilter] = useState<Root | null>(null);
-  const { isBb, toggle: toggleBb } = useBb();
+  const { pitch, cycle: cyclePitch } = usePitch();
+  const semitoneOffset = pitch === 'bb' ? BB_OFFSET : pitch === 'eb' ? EB_OFFSET : 0;
   const { lang } = useLanguage();
   const tr = t(lang);
 
@@ -104,15 +106,15 @@ export default function ChordsPage() {
             </BreadcrumbList>
           </Breadcrumb>
           <button
-            onClick={toggleBb}
+            onClick={cyclePitch}
             className={cn(
               'ml-auto rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
-              isBb
+              pitch !== 'concert'
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-background text-muted-foreground hover:text-foreground',
             )}
           >
-            {isBb ? 'Bb' : tr.pitchConcert}
+            {pitch === 'bb' ? tr.pitchBb : pitch === 'eb' ? tr.pitchEb : tr.pitchConcert}
           </button>
         </header>
 
@@ -177,8 +179,8 @@ export default function ChordsPage() {
                 </thead>
                 <tbody>
                   {rows.map(({ quality, root, tones, degrees }) => {
-                    const displayRoot = isBb ? transposeNote(root, BB_OFFSET) : root;
-                    const displayTones = isBb ? transposeNotes(tones, BB_OFFSET) : tones;
+                    const displayRoot = semitoneOffset ? transposeNote(root, semitoneOffset) : root;
+                    const displayTones = semitoneOffset ? transposeNotes(tones, semitoneOffset) : tones;
                     const displaySymbol = `${displayRoot}${CHORD_SUFFIX[quality]}`;
                     return (
                       <tr

@@ -4,8 +4,9 @@ import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
 const endSessionSchema = z.object({
   ended_at: z.string().datetime(),
-  cards_reviewed: z.number().int().min(0).optional(),
+  items_completed: z.number().int().min(0).optional(),
   correct_count: z.number().int().min(0).optional(),
+  status: z.enum(['completed', 'abandoned']).optional(),
 });
 
 export async function PATCH(
@@ -25,7 +26,12 @@ export async function PATCH(
 
   const { data, error } = await db
     .from('practice_sessions')
-    .update(parsed.data)
+    .update({
+      ended_at: parsed.data.ended_at,
+      items_completed: parsed.data.items_completed,
+      correct_count: parsed.data.correct_count,
+      status: parsed.data.status ?? 'completed',
+    })
     .eq('id', id)
     .eq('user_id', userId)
     .select()

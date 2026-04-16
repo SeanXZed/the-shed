@@ -2,9 +2,11 @@
 
 A focused practice environment for jazz improvisation.
 
+**中文说明:** [`README.zh-CN.md`](README.zh-CN.md)
+
 ## Core Objective
 
-To build a single, open-source application that gives jazz musicians the essential tools they need to practise improvisation. It removes the friction of managing separate recording apps, backing tracks, and physical chord charts, allowing players to focus entirely on their instrument.
+To build a single application that gives jazz musicians the essential tools they need to practise improvisation. It removes the friction of managing separate recording apps, backing tracks, and physical chord charts, allowing players to focus entirely on their instrument.
 
 ## Target Audience
 
@@ -15,11 +17,10 @@ Jazz instrumentalists focusing on improvisation, articulation, and phrasing. The
 The project uses a single-repository (monorepo) architecture, allowing seamless sharing of types and logic across the entire application.
 
 - **Language:** TypeScript (used across both frontend and backend).
-- **Frontend:** React.
-- **Backend:** Node.js (using Express or Fastify).
+- **Frontend:** React (Next.js App Router).
+- **Backend:** Next.js Route Handlers (API routes) inside the web app.
 - **Data Fetching:** TanStack Query.
 - **Database & Storage:** Supabase (for user accounts, practice logs, and audio file storage).
-- **Licence:** MIT.
 
 ## Core Features
 
@@ -30,6 +31,9 @@ The project uses a single-repository (monorepo) architecture, allowing seamless 
 
 ## Repository Structure
 
-- `/apps/web`: The React frontend application.
-- `/apps/api`: The Node.js backend server.
-- `/packages/shared`: Shared TypeScript types (e.g., `PracticeSession`, `ChordChart`) and music theory logic.
+- `/apps/web`: Next.js web app (UI + API route handlers).
+- `/packages/shared`: Shared TypeScript types and music theory logic.
+
+## Documentation
+
+- **Product / architecture roadmap (gamification, tutors, regional auth):** [`docs/DUOLINGO_FOR_JAZZ_PLAN.md`](docs/DUOLINGO_FOR_JAZZ_PLAN.md)

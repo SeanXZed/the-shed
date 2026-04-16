@@ -82,7 +82,7 @@ export default function PracticePage() {
                   <p className="text-sm text-muted-foreground">{mode.description}</p>
                   <Link
                     href={`/practice/${mode.id}`}
-                    className={cn(buttonVariants({ variant: "outline" }), "w-fit")}
+                    className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-fit justify-center")}
                   >
                     {tr.modeStart}
                   </Link>
