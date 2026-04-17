@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { getSessionDeduped } from '@/lib/supabase/get-session-deduped';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export default function PracticePage() {
   ];
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSessionDeduped().then(({ data: { session } }) => {
       if (!session) router.replace('/login');
       else setLoading(false);
     });

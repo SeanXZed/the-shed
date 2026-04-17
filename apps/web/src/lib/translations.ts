@@ -14,6 +14,22 @@ type TranslationMap = {
   learnBullet2: string;
   learnBullet3: string;
   learnGoFreePractice: string;
+  learnPathsPreviewHeading: string;
+  learnPathJazz101Title: string;
+  learnPathJazz101Body: string;
+  learnPathBirdTitle: string;
+  learnPathBirdBody: string;
+  learnPathMilesTitle: string;
+  learnPathMilesBody: string;
+  learnPathSoonTitle: string;
+  learnPathSoonBody: string;
+
+  jazz101PageTitle: string;
+  jazz101PathSubtitle: string;
+  jazz101LessonLocked: string;
+  jazz101OpenLesson: string;
+  jazz101Lesson1Title: string;
+  jazz101Lesson1Placeholder: string;
 
   authLoginTitle: string;
   authLoginSubtitle: string;
@@ -145,6 +161,28 @@ const en: TranslationMap = {
   learnBullet2:          'Prerequisites and unlocks so you always know what to do next',
   learnBullet3:          'Tutor-friendly visibility into what students are working on',
   learnGoFreePractice:   'Go to Free Practice',
+  learnPathsPreviewHeading: 'A look ahead',
+  learnPathJazz101Title: 'Jazz 101',
+  learnPathJazz101Body:
+    'Where every journey begins. Master the fundamentals — scales, chords, intervals, and the core building blocks of jazz harmony. No experience required, just curiosity and a willingness to shed.',
+  learnPathBirdTitle: 'The Bird Path — Charlie Parker',
+  learnPathBirdBody:
+    'Bebop is the grammar of jazz. Learn the language of rapid harmonic movement, chromatic vocabulary, and rhythmic sophistication through the innovations of the most influential improviser in jazz history. This is where jazz gets serious.',
+  learnPathMilesTitle: 'Path to Miles Davis',
+  learnPathMilesBody:
+    'From bebop to modal. Having mastered the complexity of bebop, learn the art of restraint, space, and melodic economy. Kind of Blue didn\'t come from nowhere — this path shows you exactly how Miles got there and what it means harmonically.',
+  learnPathSoonTitle: 'Coming Soon',
+  learnPathSoonBody:
+    'The journey continues. More paths, more masters, more voices. Where does your shed take you next?',
+
+  jazz101PageTitle:     'Jazz 101',
+  jazz101PathSubtitle:
+    'Demo path — follow the trail lesson by lesson. Only the current step is unlocked; the rest are coming soon.',
+  jazz101LessonLocked:  'Locked',
+  jazz101OpenLesson:    'Open lesson',
+  jazz101Lesson1Title: 'The 12 Notes',
+  jazz101Lesson1Placeholder:
+    'Lesson content is coming soon. In Western music, one octave has twelve pitch classes — the chromatic scale. Here they are in order (enharmonic spelling uses flats except C# and F#, common in jazz charts):',
 
   authLoginTitle:        'Login to your account',
   authLoginSubtitle:     'Enter your email below to sign in.',
@@ -368,6 +406,28 @@ const zh: TranslationMap = {
   learnBullet2:          '前置与解锁，让你始终清楚下一步该练什么',
   learnBullet3:          '便于老师了解学员在练的内容（后续版本）',
   learnGoFreePractice:   '前往自由练习',
+  learnPathsPreviewHeading: '先行预览',
+  learnPathJazz101Title: '爵士入门 101',
+  learnPathJazz101Body:
+    '一切从这里开始。掌握基本功：音阶、和弦、音程与爵士和声的核心知识。无需经验，只要好奇与愿意「开练」。',
+  learnPathBirdTitle: '大鸟之路 — 查理·帕克',
+  learnPathBirdBody:
+    '比波普是爵士的语法。通过爵士史上最具影响力的即兴者，学习快速和声进行、半音语汇与节奏上的精细。爵士从这里开始真正「上强度」。',
+  learnPathMilesTitle: '迈尔斯之路',
+  learnPathMilesBody:
+    '从比波普走向调式。在掌握比波普的复杂之后，学习克制、留白与旋律的极简。《Kind of Blue》并非凭空而来——这条路径讲清迈尔斯如何走到那里，以及在和声上意味着什么。',
+  learnPathSoonTitle: '敬请期待',
+  learnPathSoonBody:
+    '旅程还在继续。更多路径、更多大师、更多声音。你的下一站在哪里？',
+
+  jazz101PageTitle:     '爵士入门 101',
+  jazz101PathSubtitle:
+    '演示路径 — 按顺序解锁。当前仅开放第一课，其余内容即将推出。',
+  jazz101LessonLocked:  '未解锁',
+  jazz101OpenLesson:    '进入课程',
+  jazz101Lesson1Title: '十二个音',
+  jazz101Lesson1Placeholder:
+    '正式课程内容即将上线。西方音乐中，一个八度内有十二个音高类别（半音阶）。以下按顺序列出（爵士谱例中常用降号写法，C#、F# 除外）：',
 
   authLoginTitle:        '登录账号',
   authLoginSubtitle:     '在下方输入邮箱和密码。',

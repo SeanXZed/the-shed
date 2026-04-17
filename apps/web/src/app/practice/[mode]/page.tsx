@@ -17,11 +17,14 @@ import {
   transposeNotes,
   BB_OFFSET,
   EB_OFFSET,
+  formatNoteWithEnharmonicHint,
+  formatNotesWithEnharmonicHints,
   type ChordQuality,
   type Grade,
   type Root,
 } from '@the-shed/shared';
 import { supabase } from '@/lib/supabase/client';
+import { getSessionDeduped } from '@/lib/supabase/get-session-deduped';
 import { useAllGameItems, useDueGameItems, useInvalidateGameItems, type GameItemRow } from '@/hooks/use-game-items';
 import { usePitch } from '@/hooks/use-bb';
 import { useAdaptiveWeights } from '@/hooks/use-adaptive';
@@ -536,7 +539,7 @@ async function gradeCard(
   isCram?: boolean,
   meta?: Record<string, unknown>,
 ): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSessionDeduped();
   const res = await fetch(`/api/game-items/${gameItemId}/grade`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
@@ -562,7 +565,7 @@ function NoteRow({ notes, degrees }: { notes: readonly string[]; degrees: readon
         <tbody>
           <tr>
             {notes.map((note, i) => (
-              <td key={i} className="text-xl font-semibold tabular-nums">{note}</td>
+              <td key={i} className="text-xl font-semibold tabular-nums">{formatNoteWithEnharmonicHint(note)}</td>
             ))}
           </tr>
           <tr>
@@ -718,7 +721,7 @@ function TwoFiveOneFront({ item, semitoneOffset, tr }: { item: TwoFiveOneItem; s
     <div className="text-center space-y-4">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground uppercase tracking-widest">{tr.label251}</p>
-        <p className="text-3xl font-bold">{displayKey} {item.tonality === 'major' ? 'Major' : 'Minor'}</p>
+        <p className="text-3xl font-bold">{formatNoteWithEnharmonicHint(displayKey ?? item.key)} {item.tonality === 'major' ? 'Major' : 'Minor'}</p>
       </div>
       <div className="flex items-center justify-center gap-4 text-2xl font-mono">
         <span className="text-muted-foreground">{iiSymbol}</span>
@@ -853,7 +856,8 @@ function AnswerReview({ userAnswer, score, tr }: { userAnswer: string; score: An
 
       {missing.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Missing: <span className="font-mono text-rose-500">{missing.join('  ')}</span>
+          Missing:{' '}
+          <span className="font-mono text-rose-500">{formatNotesWithEnharmonicHints(missing).join('  ')}</span>
         </p>
       )}
     </div>
@@ -965,7 +969,7 @@ export default function PracticeModePage() {
 
   // Auth gate
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSessionDeduped().then(({ data: { session } }) => {
       if (!session) router.replace('/login');
       else setAuthed(true);
     });
@@ -974,7 +978,7 @@ export default function PracticeModePage() {
   // Ensure games/items/state exist (once per session)
   useEffect(() => {
     if (!authed || ensured) return;
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    getSessionDeduped().then(async ({ data: { session } }) => {
       if (!session) return;
       setEnsureError(null);
       const headers = { Authorization: `Bearer ${session.access_token}` };
@@ -1133,7 +1137,7 @@ export default function PracticeModePage() {
     const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
     const postGameSlug = DB_MODE_TO_GAME_SLUG[dbMode] ?? 'full_scale';
     const deckSnapshot = deck;
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    getSessionDeduped().then(async ({ data: { session } }) => {
       if (!session) return;
       const res = await fetch('/api/sessions', {
         method: 'POST',
@@ -1176,7 +1180,7 @@ export default function PracticeModePage() {
   useEffect(() => {
     if (!done || !sessionIdRef.current) return;
     const sid = sessionIdRef.current;
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    getSessionDeduped().then(async ({ data: { session } }) => {
       if (!session) return;
       await fetch(`/api/sessions/${sid}`, {
         method: 'PATCH',
@@ -1351,7 +1355,7 @@ export default function PracticeModePage() {
       const nextIdx = index + 1;
       const sidPersist = sessionIdRef.current;
       if (sidPersist && config) {
-        const { data: { session: authSession } } = await supabase.auth.getSession();
+        const { data: { session: authSession } } = await getSessionDeduped();
         if (authSession) {
           await fetch(`/api/sessions/${sidPersist}`, {
             method: 'PATCH',

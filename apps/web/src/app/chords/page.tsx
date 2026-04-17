@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { getSessionDeduped } from '@/lib/supabase/get-session-deduped';
 import { usePitch } from '@/hooks/use-bb';
 import { useLanguage } from '@/hooks/use-language';
 import { t } from '@/lib/translations';
@@ -15,6 +15,7 @@ import {
   transposeNotes,
   BB_OFFSET,
   EB_OFFSET,
+  formatNotesWithEnharmonicHints,
   type Root,
   type ChordQuality,
 } from '@the-shed/shared';
@@ -69,7 +70,7 @@ export default function ChordsPage() {
   const tr = t(lang);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSessionDeduped().then(({ data: { session } }) => {
       if (!session) router.replace('/login');
       else setAuthed(true);
     });
@@ -180,7 +181,9 @@ export default function ChordsPage() {
                 <tbody>
                   {rows.map(({ quality, root, tones, degrees }) => {
                     const displayRoot = semitoneOffset ? transposeNote(root, semitoneOffset) : root;
-                    const displayTones = semitoneOffset ? transposeNotes(tones, semitoneOffset) : tones;
+                    const displayTones = formatNotesWithEnharmonicHints(
+                      semitoneOffset ? transposeNotes(tones, semitoneOffset) : tones,
+                    );
                     const displaySymbol = `${displayRoot}${CHORD_SUFFIX[quality]}`;
                     return (
                       <tr

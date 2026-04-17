@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase/client"
+import { getSessionDeduped } from "@/lib/supabase/get-session-deduped"
 import { AppSidebar } from "@/components/app-sidebar"
-import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Breadcrumb,
@@ -19,10 +18,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { Music2 } from "lucide-react"
 import { useLanguage } from "@/hooks/use-language"
 import { t } from "@/lib/translations"
-import { cn } from "@/lib/utils"
 
 export default function TrackPage() {
   const router = useRouter()
@@ -31,7 +28,7 @@ export default function TrackPage() {
   const tr = t(lang)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSessionDeduped().then(({ data: { session } }) => {
       if (!session) router.replace("/login")
       else setAuthed(true)
     })
@@ -73,15 +70,60 @@ export default function TrackPage() {
                 <li>{tr.learnBullet2}</li>
                 <li>{tr.learnBullet3}</li>
               </ul>
-              <Link
-                href="/practice"
-                className={cn(buttonVariants({ variant: "default", size: "lg" }), "mt-2 w-full justify-center sm:w-fit")}
-              >
-                <Music2 className="mr-2 size-4" />
-                {tr.learnGoFreePractice}
-              </Link>
             </CardContent>
           </Card>
+
+          <section className="space-y-3" aria-labelledby="learn-paths-preview-heading">
+            <h2
+              id="learn-paths-preview-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {tr.learnPathsPreviewHeading}
+            </h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+              <Link
+                href="/track/jazz-101"
+                className="group block rounded-xl ring-offset-background transition-all duration-200 ease-out hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99]"
+              >
+                <Card className="h-full border-2 border-transparent transition-all duration-200 ease-out group-hover:border-neutral-800 group-hover:bg-neutral-950 group-hover:shadow-lg group-hover:shadow-black/25 dark:group-hover:border-neutral-200 dark:group-hover:bg-white dark:group-hover:shadow-white/10">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base leading-snug transition-colors duration-200 group-hover:text-white dark:group-hover:text-neutral-950">
+                      {tr.learnPathJazz101Title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm leading-relaxed text-muted-foreground transition-colors duration-200 group-hover:text-white/90 dark:group-hover:text-neutral-950/85">
+                      {tr.learnPathJazz101Body}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base leading-snug">{tr.learnPathBirdTitle}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-sm leading-relaxed text-muted-foreground">{tr.learnPathBirdBody}</p>
+                </CardContent>
+              </Card>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base leading-snug">{tr.learnPathMilesTitle}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-sm leading-relaxed text-muted-foreground">{tr.learnPathMilesBody}</p>
+                </CardContent>
+              </Card>
+              <Card className="h-full border-dashed border-muted-foreground/35 bg-muted/30 ring-muted-foreground/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base leading-snug">{tr.learnPathSoonTitle}</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-sm leading-relaxed text-muted-foreground">{tr.learnPathSoonBody}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         </div>
       </SidebarInset>
     </SidebarProvider>

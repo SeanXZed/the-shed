@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { getSessionDeduped } from '@/lib/supabase/get-session-deduped';
 import { AppSidebar } from '@/components/app-sidebar';
 import {
   SidebarInset,
@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const { pitch, setPitch } = usePitch();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSessionDeduped().then(({ data: { session } }) => {
       if (!session) router.replace('/login');
       else setAuthed(true);
     });

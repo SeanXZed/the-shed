@@ -1,5 +1,11 @@
 // Constants
-export { CHROMATIC, noteToSemitone, semitoneToNote } from './constants/chromatic';
+export {
+  CHROMATIC,
+  noteToSemitone,
+  semitoneToNote,
+  formatNoteWithEnharmonicHint,
+  formatNotesWithEnharmonicHints,
+} from './constants/chromatic';
 export { ROOTS, isRoot } from './constants/roots';
 export { SCALE_DEFINITIONS, SCALE_MAP, getScaleDefinition } from './constants/scaleDefinitions';
 

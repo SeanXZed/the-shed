@@ -8,7 +8,7 @@ This document captures product vision and **architectural direction** for evolvi
 
 ## 0. Baseline (what already exists)
 
-This plan is written *from the current codebase*, not from a blank slate. As of 2026-04-16, the following are already working:
+This plan is written *from the current codebase*, not from a blank slate. As of 2026-04-17, the following are already working:
 
 - **Practice modes (games)**: `full_scale`, `full_chord`, `sequence`, `251`, `interval`
 - **Grading & scheduling**: game-item grading route (`/api/game-items/[id]/grade`) + per-user due state in `user_game_item_state`
@@ -21,7 +21,8 @@ This plan is written *from the current codebase*, not from a blank slate. As of 
   - **XP** (derived from `game_events.grade`, shown on dashboard + inside practice)
 - **Foundation**: auth, i18n (EN/ZH), Concert/Bb/**Eb** transposition, audio playback (Tone.js)
 - **Shared theory**: `TheoryMapper`, `twoFiveOne`, `sm2`, `scaleDefinitions`, `transpose`
-- **Navigation UX**: top-level nav is `Dashboard` + **The Shed** (structured track / curriculum placeholder at `/track`) + **Free Practice** + `Library` (Scales/Chords); **Preferences** lives in user menu
+- **Navigation UX**: top-level nav is `Dashboard` + **The Shed** (`/track`; `/learn` redirects here) + **Free Practice** + `Library` (Scales/Chords); **Preferences** lives in user menu
+- **Curriculum shell (demo only)**: **`/track/jazz-101`** — sectioned path UI (18 lesson nodes), first lesson opens **`/track/jazz-101/lesson/1`** (placeholder: 12 chromatic notes from `@the-shed/shared`). **No** server-backed `user_node_state`, authoring, or completion gating yet — UI and routing only.
 
 **Implication:** “Game/event foundation” is not a future phase — it’s already present. The roadmap below is a re-baselined plan from this starting point.
 
@@ -34,7 +35,7 @@ Free practice is **feature-complete enough for an MVP**:
 - **Track**: every grade logs `game_events` and rolls up into `practice_sessions`
 - **See progress**: dashboard shows history + weekly trend + XP; practice shows XP feedback
 
-Next steps should focus on **guided learning (skill tree)** and **tutor visibility** rather than polishing free-practice further.
+Next steps should focus on **wiring the curriculum to real games + persistence** (beyond the Jazz 101 shell), then **tutor visibility**, rather than polishing free-practice further.
 
 ---
 
@@ -142,7 +143,7 @@ Even before RBAC/tenancy is shipped, we should support **basic per-user preferen
   - model as `studio_user_settings` keyed by `(studio_id, user_id)` with an override `pitch_mode`
   - fallback order: `studio_user_settings` → `user_settings` → local defaults
 
-Until RBAC is implemented, instrument selection remains a **simple client-side button** (persisted locally); DB-backed settings should not be required for basic use.
+Until RBAC is implemented, instrument pitch (Concert / B♭ / E♭) is driven by a **client toggle** with **localStorage**; logged-in users also **best-effort sync** to `user_settings.pitch_mode` when available, so DB-backed defaults are optional, not required for basic use.
 
 ---
 
@@ -245,7 +246,7 @@ Historically, the `cards` table served double duty and also coupled several game
 - a **content catalog** (seeded per user), and
 - the **per-user state** (SM-2 fields, last reviewed timestamps).
 
-To support truly independent games (Scale / Chord / Sequence / Chord Progression / Interval), curriculum nodes, and tutor reporting safely, these responsibilities were split into `games` + `game_items` + `user_game_item_state` + `game_events`. The remaining work is cleanup, parity verification, and any historical backfill still worth keeping.
+To support truly independent games (Scale / Chord / Sequence / Chord Progression / Interval), curriculum nodes, and tutor reporting safely, these responsibilities were split into `games` + `game_items` + `user_game_item_state` + `game_events`. Legacy `cards` / `practice_events` **source** files were removed from `supabase/tables/` after migration (see `migrations/0001_init.sql` historical note). Remaining work is cleanup, parity verification, and any historical backfill still worth keeping.
 
 **Migration order (high-level, with rollback in mind):**
 
@@ -302,47 +303,40 @@ If that day comes, **extract a dedicated API** (or split `apps/api`) **without c
 
 ---
 
-## 7.1 Reference: `nextjs-duolingo-clone` (what we can learn)
+## 7.1 Duolingo-style reference patterns (no vendored clone in-repo)
 
-We keep a functional UX reference project at `reference/nextjs-duolingo-clone/`. It is **not** a target architecture, but it contains patterns worth reusing.
+This repo does **not** include a copy of the `nextjs-duolingo-clone` tutorial project. The ideas below are **conceptual** lessons from typical Duolingo-style Next.js examples (courses → units → lessons, path UI, server actions for progress). Use them as design direction, not as code to paste.
 
 ### Patterns to borrow
 
 - **Content tables + per-user progress joins**
-  - Their model is `courses → units → lessons → challenges` + per-user join tables (`challenge_progress`, `user_progress`).
+  - Model: `courses → units → lessons → challenges` + per-user join tables (`challenge_progress`, `user_progress`).
   - For The Shed, map this conceptually to: **sections → nodes → game runs**, with **user_node_state** and **attempts/events** as joins.
-  - Where to look: `reference/nextjs-duolingo-clone/db/schema.ts`, `reference/nextjs-duolingo-clone/db/queries.ts` (e.g. `getUnits`, `getCourseProgress`, `getLessonPercentage`).
 
 - **Next.js App Router split: server-rendered pages + client “runtime”**
   - Server components fetch the graph and render quickly; interactive state lives in a client component (quiz loop).
   - This is a good template for a future “node runtime” that composes games.
-  - Where to look: `reference/nextjs-duolingo-clone/app/(main)/learn/page.tsx`, `reference/nextjs-duolingo-clone/app/lesson/quiz.tsx`.
 
 - **Progress mutations via server actions + cache invalidation**
   - “Complete challenge, award points, revalidate” is a strong pattern for game scoring and node gating.
-  - Where to look: `reference/nextjs-duolingo-clone/actions/challenge-progress.ts`, `reference/nextjs-duolingo-clone/actions/user-progress.ts`.
 
 - **A simple “path” UI trick**
-  - Their lesson button indentation yields a Duolingo-like path feel with minimal complexity.
-  - Where to look: `reference/nextjs-duolingo-clone/app/(main)/learn/lesson-button.tsx`.
+  - Alternating lesson button positions (indentation) can yield a Duolingo-like path with minimal complexity.
 
 - **Admin tooling pattern**
   - React Admin + thin route handlers is a pragmatic way to manage authored content (sections/nodes/game params) early on.
-  - Where to look: `reference/nextjs-duolingo-clone/app/admin/app.tsx`, `reference/nextjs-duolingo-clone/app/api/*/route.ts`.
 
-### Patterns to avoid (don’t copy directly)
+### Patterns to avoid (don’t copy directly from naive clones)
 
 - **Hardcoded admin allowlists**
-  - The reference app uses a userId allowlist for admin.
+  - Many demo apps use a userId allowlist for admin.
   - The Shed should use **Supabase RBAC + RLS** (roles + memberships) instead.
-  - Where to look: `reference/nextjs-duolingo-clone/lib/admin.ts`.
 
 - **No append-only telemetry**
-  - The reference app stores “completed” progress but does not keep a detailed attempt/event log. We need attempts/events for adaptive sequencing, analytics, tutor reporting, and LLM summaries.
+  - Tutorial apps often store “completed” progress but not a detailed attempt/event log. We need attempts/events for adaptive sequencing, analytics, tutor reporting, and LLM summaries.
 
 - **Simplistic gating**
   - “Locked unless current” is fine for a demo but not enough for game-based nodes with explicit requirements.
-  - Where to look: `reference/nextjs-duolingo-clone/app/(main)/learn/unit.tsx`.
 
 ---
 
@@ -357,7 +351,7 @@ This is the **living execution order**. It is intentionally re-baselined from th
 | 3 | **Progress history UI** | ✅ Done | Dashboard recent sessions + 7-day trend |
 | 4 | **Gamification basics (XP only)** | ✅ Done | XP derived from `game_events` (dashboard + practice feedback) |
 | 5 | **Game-based state split (schema migration)** | ✅ Done | `games`/`game_items`/`user_game_item_state`/`game_events` + legacy cleanup |
-| 6 | **Curriculum MVP (tracks → nodes)** | 🔜 Next | Minimal skill tree so users have “what to practice next” (uses existing games) |
+| 6 | **Curriculum MVP (tracks → nodes)** | 🟡 In progress | **Shell:** Jazz 101 UI + routes (`/track/jazz-101`, lesson 1 placeholder). **Still to ship:** DB-backed nodes/progress, bind lessons to existing game modes, authoring or seed pipeline |
 | 7 | **Content authoring admin** | Pending | Non-hardcoded authoring flow for tracks/nodes/game params |
 | 8 | **Tutor v1 (read-only)** | Pending | Roster + read-only student progress views (leverages phases 1/3/4 data) |
 | 9 | **Google OAuth / regional auth** | Pending | OAuth login for global users |
@@ -370,6 +364,7 @@ This is the **living execution order**. It is intentionally re-baselined from th
 
 Before implementing phases that change schema or authorization, the following design artifacts must exist:
 
+- **Jazz 101 (and future tracks)**: lesson → `game_slug` / `game_item` mapping, completion rules, and where progress is stored (new tables vs reusing `user_game_item_state` + `game_events` with `node_id` metadata).
 - **RBAC SQL schema**: concrete tables for studios/groups, memberships, tutor/student relationships, role enums.
 - **Game migration plan**: step-by-step rollout order **with rollback**, including mapping for Scale/Chord/Sequence/Chord Progression(251)/Interval and all impacted routes/hooks/queries.
 - **SM-2 decision**: explicitly choose one (and document):

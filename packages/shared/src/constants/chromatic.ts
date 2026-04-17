@@ -32,3 +32,25 @@ export function semitoneToNote(semitone: number): string {
   if (note === undefined) throw new Error(`Invalid semitone: ${semitone}`);
   return note;
 }
+
+/** Rare diatonic spellings → clearer 12-TET name for UI (display only). */
+const ENHARMONIC_DISPLAY_HINTS: Record<string, string> = {
+  'E#': 'F',
+  Cb: 'B',
+  Fb: 'E',
+  'B#': 'C',
+};
+
+/**
+ * Display-only: append a common enharmonic in parentheses for E#, Cb, Fb, B#
+ * (no space before `(` so it reads as one label, e.g. `Cb(B)`).
+ * Other spellings are returned unchanged.
+ */
+export function formatNoteWithEnharmonicHint(note: string): string {
+  const hint = ENHARMONIC_DISPLAY_HINTS[note];
+  return hint != null ? `${note}(${hint})` : note;
+}
+
+export function formatNotesWithEnharmonicHints(notes: readonly string[]): string[] {
+  return notes.map(formatNoteWithEnharmonicHint);
+}
