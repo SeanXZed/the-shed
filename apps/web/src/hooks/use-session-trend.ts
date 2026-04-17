@@ -27,8 +27,12 @@ type SessionTrendDay = {
   xp: number;
 };
 
-function toDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/** Calendar date in the user's local timezone (YYYY-MM-DD). */
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export function useSessionTrend(days = 7) {
@@ -71,7 +75,7 @@ export function useSessionTrend(days = 7) {
     for (let offset = days - 1; offset >= 0; offset--) {
       const date = new Date(today);
       date.setDate(today.getDate() - offset);
-      const key = toDateKey(date);
+      const key = toLocalDateKey(date);
       dayMap.set(key, {
         date: key,
         label: new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date),
@@ -83,7 +87,7 @@ export function useSessionTrend(days = 7) {
     }
 
     for (const row of data?.sessions ?? []) {
-      const key = toDateKey(new Date(row.started_at));
+      const key = toLocalDateKey(new Date(row.started_at));
       const day = dayMap.get(key);
       if (!day) continue;
       day.sessions += 1;
@@ -92,7 +96,7 @@ export function useSessionTrend(days = 7) {
     }
 
     for (const row of data?.events ?? []) {
-      const key = toDateKey(new Date(row.occurred_at));
+      const key = toLocalDateKey(new Date(row.occurred_at));
       const day = dayMap.get(key);
       if (!day) continue;
       day.xp += getEventXp({

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { usePitch } from '@/hooks/use-bb';
-import { SCALE_DEFINITIONS, ROOTS, getScaleData, transposeNotes, BB_OFFSET, EB_OFFSET, type Root } from '@the-shed/shared';
+import { SCALE_DEFINITIONS, ROOTS, getScaleData, BB_OFFSET, EB_OFFSET, type Root } from '@the-shed/shared';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -137,11 +137,11 @@ export default function ScalesPage() {
                     >
                       <td className="px-4 py-2 font-medium">{def.name}</td>
                       <td className="px-4 py-2 font-mono">
-                        {semitoneOffset === 0 ? root : semitoneOffset === BB_OFFSET ? data.trumpetNotes[0] : transposeNotes(data.concertNotes, semitoneOffset)[0]}
+                        {semitoneOffset === 0 ? root : semitoneOffset === BB_OFFSET ? data.trumpetNotes[0] : data.ebNotes[0]}
                       </td>
                       <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs leading-relaxed">
                         <div className="text-foreground tracking-wide">
-                          {(semitoneOffset === 0 ? data.concertNotes : semitoneOffset === BB_OFFSET ? data.trumpetNotes : transposeNotes(data.concertNotes, semitoneOffset)).join('  ')}
+                          {(semitoneOffset === 0 ? data.concertNotes : semitoneOffset === BB_OFFSET ? data.trumpetNotes : data.ebNotes).join('  ')}
                         </div>
                         <div className="text-muted-foreground tracking-wide">{def.degreeLabels.join('  ')}</div>
                       </td>

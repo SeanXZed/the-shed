@@ -13,7 +13,7 @@ const EXPECTED_CONCERT_NOTES: Record<string, string[]> = {
   phrygian:           ['C', 'Db', 'Eb', 'F', 'G', 'Ab', 'Bb'],
   lydian:             ['C', 'D', 'E', 'F#', 'G', 'A', 'B'],
   mixolydian:         ['C', 'D', 'E', 'F', 'G', 'A', 'Bb'],
-  locrian:            ['C', 'Db', 'Eb', 'F', 'F#', 'Ab', 'Bb'],
+  locrian:            ['C', 'Db', 'Eb', 'F', 'Gb', 'Ab', 'Bb'],
   minor_blues:        ['C', 'Eb', 'F', 'F#', 'G', 'Bb'],
   mixolydian_b9b13:   ['C', 'Db', 'E', 'F', 'G', 'Ab', 'Bb'],
   lydian_dominant:    ['C', 'D', 'E', 'F#', 'G', 'A', 'Bb'],
@@ -21,7 +21,7 @@ const EXPECTED_CONCERT_NOTES: Record<string, string[]> = {
   bebop_major:        ['C', 'D', 'E', 'F', 'G', 'Ab', 'A', 'B'],
   bebop_minor:        ['C', 'D', 'Eb', 'E', 'F', 'G', 'A', 'Bb'],
   bebop_dominant:     ['C', 'D', 'E', 'F', 'G', 'A', 'Bb', 'B'],
-  bebop_diminished:   ['C', 'Db', 'Eb', 'E', 'F#', 'G', 'A', 'Bb'],
+  bebop_diminished:   ['C', 'Db', 'Eb', 'E', 'Gb', 'G', 'A', 'Bb'],
 };
 
 describe('getScaleData — all 17 scales at root C (concert pitch)', () => {
@@ -43,11 +43,10 @@ describe('getScaleData — chord symbols at root C', () => {
 });
 
 describe('getScaleData — Bb transposition', () => {
-  it('C Altered: trumpet notes shift by +2 semitones', () => {
+  it('C Altered: trumpet line spelled at written root D (Bb transposition)', () => {
     const data = getScaleData('C', 'altered');
-    // Concert: C Db Eb E F# Ab Bb  (F# is canonical for semitone 6)
-    // Bb (+2): D Eb F F# Ab Bb C  (F#+2 = Ab)
-    expect(data.trumpetNotes).toEqual(['D', 'Eb', 'F', 'F#', 'Ab', 'Bb', 'C']);
+    // Concert C altered; horn reads as D altered — same intervals, key-consistent spelling.
+    expect(data.trumpetNotes).toEqual(['D', 'Eb', 'F', 'F#', 'G#', 'Bb', 'C']);
   });
 
   it('C Altered: trumpet chord symbol is D7', () => {
@@ -56,7 +55,7 @@ describe('getScaleData — Bb transposition', () => {
 
   it('C Major: trumpet notes are D Major', () => {
     const data = getScaleData('C', 'major');
-    expect(data.trumpetNotes).toEqual(['D', 'E', 'F#', 'G', 'A', 'B', 'Db']);
+    expect(data.trumpetNotes).toEqual(['D', 'E', 'F#', 'G', 'A', 'B', 'C#']);
   });
 
   it('C Major: trumpet chord symbol is D∆7', () => {
@@ -82,7 +81,7 @@ describe('getScaleData — other roots', () => {
 
   it('F# Lydian Dominant notes', () => {
     const data = getScaleData('F#', 'lydian_dominant');
-    expect(data.concertNotes).toEqual(['F#', 'Ab', 'Bb', 'C', 'Db', 'Eb', 'E']);
+    expect(data.concertNotes).toEqual(['F#', 'G#', 'A#', 'B#', 'C#', 'D#', 'E']);
   });
 });
 

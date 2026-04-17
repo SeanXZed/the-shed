@@ -1,6 +1,6 @@
 import type { Root } from '../constants/roots';
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
 import { isRoot } from '../constants/roots';
+import { transposeRoot } from './diatonicSpelling';
 
 export interface TwoFiveOneChord {
   scaleType: string;
@@ -30,10 +30,8 @@ const MINOR_SCALE_TYPES = {
 } as const;
 
 function computeRoot(key: Root, semitones: number): Root {
-  const note = semitoneToNote(noteToSemitone(key) + semitones);
+  const note = transposeRoot(key, semitones);
   if (!isRoot(note)) {
-    // Enharmonic mismatch (e.g. computed Gb instead of F#): find the canonical Root
-    // This shouldn't happen with our canonical chromatic, but guard anyway.
     throw new Error(`Computed root "${note}" is not in ROOTS. Check enharmonic spelling for key "${key}".`);
   }
   return note;

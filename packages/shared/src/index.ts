@@ -5,6 +5,14 @@ export { SCALE_DEFINITIONS, SCALE_MAP, getScaleDefinition } from './constants/sc
 
 // Theory
 export { applyIntervals, getScaleData } from './theory/TheoryMapper';
+export {
+  spellScaleForRoot,
+  spellSevenNoteScale,
+  spellAltered,
+  transposeRoot,
+  rootPrefersSharps,
+  pitchClassToPreferredName,
+} from './theory/diatonicSpelling';
 export { transposeNote, transposeNotes, BB_OFFSET, EB_OFFSET } from './theory/transpose';
 export {
   CHORD_TONE_INTERVALS,

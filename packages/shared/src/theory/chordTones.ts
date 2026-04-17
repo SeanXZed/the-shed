@@ -1,5 +1,6 @@
 import type { ChordQuality } from '../constants/scaleDefinitions';
-import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
+import type { Root } from '../constants/roots';
+import { getChordTonesSpelled } from './diatonicSpelling';
 
 // Semitone offsets from root for each chord quality.
 export const CHORD_TONE_INTERVALS: Record<ChordQuality, readonly number[]> = {
@@ -31,10 +32,7 @@ export const CHORD_SUFFIX: Record<ChordQuality, string> = {
 };
 
 export function getChordTones(root: string, quality: ChordQuality): string[] {
-  const rootSemitone = noteToSemitone(root);
-  return CHORD_TONE_INTERVALS[quality].map((offset) =>
-    semitoneToNote(rootSemitone + offset)
-  );
+  return getChordTonesSpelled(root as Root, quality);
 }
 
 export function getChordSymbol(root: string, quality: ChordQuality): string {

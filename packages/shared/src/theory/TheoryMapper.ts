@@ -1,7 +1,8 @@
 import type { Root } from '../constants/roots';
 import { noteToSemitone, semitoneToNote } from '../constants/chromatic';
 import { getScaleDefinition } from '../constants/scaleDefinitions';
-import { transposeNotes, BB_OFFSET } from './transpose';
+import { BB_OFFSET, EB_OFFSET } from './transpose';
+import { spellScaleForRoot, spellSevenNoteScale, transposeRoot } from './diatonicSpelling';
 import {
   getChordTones,
   getChordSymbol,
@@ -23,13 +24,21 @@ export interface ScaleData {
   trumpetChordTones: readonly string[];
   trumpetChordSymbol: string;
 
+  // Eb transposition (display only)
+  ebNotes: readonly string[];
+  ebChordTones: readonly string[];
+  ebChordSymbol: string;
+
   // Shared across concert/Bb
   scaleDegrees: readonly string[];
   chordDegrees: readonly string[];
 }
 
-// Apply semitone intervals to a root to produce note names.
+/** Apply semitone intervals; 7-note scales use diatonic spelling. */
 export function applyIntervals(root: Root, intervals: readonly number[]): string[] {
+  if (intervals.length === 7) {
+    return spellSevenNoteScale(root, intervals);
+  }
   const rootSemitone = noteToSemitone(root);
   return intervals.map((offset) => semitoneToNote(rootSemitone + offset));
 }
@@ -37,14 +46,19 @@ export function applyIntervals(root: Root, intervals: readonly number[]): string
 export function getScaleData(root: Root, scaleId: string): ScaleData {
   const def = getScaleDefinition(scaleId);
 
-  const concertNotes = applyIntervals(root, def.intervals);
+  const concertNotes = spellScaleForRoot(root, scaleId);
   const concertChordTones = getChordTones(root, def.chordQuality);
   const concertChordSymbol = getChordSymbol(root, def.chordQuality);
 
-  const trumpetNotes = transposeNotes(concertNotes, BB_OFFSET);
-  const trumpetRoot = semitoneToNote(noteToSemitone(root) + BB_OFFSET);
+  const trumpetRoot = transposeRoot(root, BB_OFFSET);
+  const trumpetNotes = spellScaleForRoot(trumpetRoot, scaleId);
   const trumpetChordTones = getChordTones(trumpetRoot, def.chordQuality);
   const trumpetChordSymbol = getChordSymbol(trumpetRoot, def.chordQuality);
+
+  const ebRoot = transposeRoot(root, EB_OFFSET);
+  const ebNotes = spellScaleForRoot(ebRoot, scaleId);
+  const ebChordTones = getChordTones(ebRoot, def.chordQuality);
+  const ebChordSymbol = getChordSymbol(ebRoot, def.chordQuality);
 
   return {
     scaleId: def.id,
@@ -56,6 +70,9 @@ export function getScaleData(root: Root, scaleId: string): ScaleData {
     trumpetNotes,
     trumpetChordTones,
     trumpetChordSymbol,
+    ebNotes,
+    ebChordTones,
+    ebChordSymbol,
     scaleDegrees: def.degreeLabels,
     chordDegrees: CHORD_TONE_DEGREES[def.chordQuality],
   };
