@@ -15,6 +15,8 @@ export type RecentSession = {
   xp: number;
   game_title: string;
   game_slug: string;
+  /** True when this row can be opened to continue an in-progress deck. */
+  canResume: boolean;
 };
 
 export function useRecentSessions(limit = 5) {
@@ -24,7 +26,7 @@ export function useRecentSessions(limit = 5) {
     queryFn: async (): Promise<RecentSession[]> => {
       const { data, error } = await supabase
         .from('practice_sessions')
-        .select('id,started_at,ended_at,status,is_cram,items_completed,correct_count,games!inner(title,slug)')
+        .select('id,started_at,ended_at,status,is_cram,items_completed,correct_count,config,games!inner(title,slug)')
         .order('started_at', { ascending: false })
         .limit(limit);
 
@@ -64,17 +66,35 @@ export function useRecentSessions(limit = 5) {
       return (data ?? []).map((row) => {
         const game = (row as unknown as { games?: { title?: string; slug?: string } }).games ?? {};
         const id = (row as { id: string }).id;
+        const cfg = (row as { config?: Record<string, unknown> | null }).config ?? null;
+        const deckIds = Array.isArray(cfg?.deck_game_item_ids)
+          ? (cfg.deck_game_item_ids as string[])
+          : [];
+        const curRaw = cfg?.current_index;
+        const curIdx =
+          typeof curRaw === 'number'
+            ? curRaw
+            : typeof curRaw === 'string'
+              ? Number.parseInt(curRaw, 10)
+              : 0;
+        const status = ((row as { status?: RecentSession['status'] }).status ?? 'completed');
+        const canResume =
+          status === 'active' &&
+          deckIds.length > 0 &&
+          Number.isFinite(curIdx) &&
+          curIdx < deckIds.length;
         return {
           id,
           started_at: (row as { started_at: string }).started_at,
           ended_at: (row as { ended_at: string | null }).ended_at,
-          status: ((row as { status?: RecentSession['status'] }).status ?? 'completed'),
+          status,
           is_cram: Boolean((row as { is_cram?: boolean }).is_cram),
           items_completed: Number((row as { items_completed?: number }).items_completed ?? 0),
           correct_count: Number((row as { correct_count?: number }).correct_count ?? 0),
           xp: xpBySession.get(id) ?? 0,
           game_title: game.title ?? 'Game',
           game_slug: game.slug ?? 'unknown',
+          canResume,
         };
       });
     },

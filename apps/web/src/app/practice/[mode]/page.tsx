@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { Loader2, Volume2 } from 'lucide-react';
@@ -27,6 +27,7 @@ import { usePitch } from '@/hooks/use-bb';
 import { useAdaptiveWeights } from '@/hooks/use-adaptive';
 import { useLanguage } from '@/hooks/use-language';
 import { t } from '@/lib/translations';
+import { GAME_SLUG_TO_PATH } from '@/lib/practiceGameRoutes';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -81,7 +82,6 @@ const DB_MODE_TO_GAME_SLUG: Record<string, 'full_scale' | 'full_chord' | 'sequen
 };
 
 const SESSION_SIZE = 20;
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 const INTERVALS = [
   { id: 'm2',  name: 'Minor 2nd',   semitones: 1  },
@@ -106,13 +106,63 @@ type PracticeConfig =
       scaleDirection: 'up' | 'down' | 'mixed';
       chordInversions: 'root' | '1' | '2' | '3' | 'random';
     }
-  | {
+    | {
       type: 'root-selected';
       roots: Root[];
       sequenceCount: number;
       scaleDirection: 'up' | 'down' | 'mixed';
       chordInversions: 'root' | '1' | '2' | '3' | 'random';
     };
+
+function parseSessionConfig(raw: Record<string, unknown>): PracticeConfig | null {
+  const rm = raw.root_mode;
+  const sd = raw.scale_direction;
+  const inv = raw.chord_inversions;
+  const scaleDirection =
+    sd === 'up' || sd === 'down' || sd === 'mixed' ? sd : 'up';
+  const chordInversions =
+    inv === 'root' || inv === '1' || inv === '2' || inv === '3' || inv === 'random' ? inv : 'root';
+
+  if (rm === 'root-free') {
+    return {
+      type: 'root-free',
+      sequenceCount: typeof raw.sequence_count === 'number' ? raw.sequence_count : 5,
+      scaleDirection,
+      chordInversions,
+    };
+  }
+  if (rm === 'root-selected' && Array.isArray(raw.roots)) {
+    return {
+      type: 'root-selected',
+      roots: raw.roots as Root[],
+      sequenceCount: typeof raw.sequence_count === 'number' ? raw.sequence_count : 5,
+      scaleDirection,
+      chordInversions,
+    };
+  }
+  return null;
+}
+
+function buildSessionConfigPayload(
+  practiceMode: PracticeMode,
+  config: PracticeConfig,
+  extras: {
+    deck_game_item_ids: string[];
+    current_index: number;
+    session_seed: string;
+  },
+): Record<string, unknown> {
+  const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
+  return {
+    mode: dbMode,
+    root_mode: config.type,
+    roots: config.type === 'root-selected' ? config.roots : null,
+    sequence_count: practiceMode === 'sequence' ? config.sequenceCount : null,
+    scale_direction: config.scaleDirection,
+    chord_inversions: config.chordInversions,
+    ...extras,
+  };
+}
 
 function rotate<T>(arr: readonly T[], by: number): T[] {
   if (arr.length === 0) return [];
@@ -342,6 +392,60 @@ function toStandardItem(mode: PracticeMode, it: GameItemRow): StandardItem | nul
   const root = parts[1] as Root | undefined;
   if (!scaleType || !root) return null;
   return { type: 'standard', kind: mode === 'sequence' ? 'sequence' : 'scale', gameItemId: it.id, canonicalKey: it.canonical_key, root, scaleType };
+}
+
+function gameItemRowToDeckItem(mode: PracticeMode, row: GameItemRow): DeckItem | null {
+  if (mode === 'interval') {
+    const [intervalId, root, direction] = row.canonical_key.split('::');
+    if (!intervalId) return null;
+    const intervalMeta = INTERVALS.find((x) => x.id === intervalId);
+    if (!intervalMeta) return null;
+    if (!root || (direction !== 'up' && direction !== 'down')) return null;
+    const semitones = direction === 'up' ? intervalMeta.semitones : -intervalMeta.semitones;
+    const answer = transposeNote(root, semitones);
+    return {
+      type: 'interval',
+      gameItemId: row.id,
+      canonicalKey: row.canonical_key,
+      root: root as Root,
+      intervalId,
+      intervalName: intervalMeta.name,
+      semitones: intervalMeta.semitones,
+      direction,
+      answer,
+    };
+  }
+  if (mode === '251') {
+    const parts = row.canonical_key.split('::');
+    if (parts[0] !== '251') return null;
+    const key = parts[1] as Root | undefined;
+    const tonality = parts[2] === 'minor' ? 'minor' : parts[2] === 'major' ? 'major' : null;
+    if (!key || !tonality) return null;
+    return {
+      type: '251',
+      gameItemId: row.id,
+      canonicalKey: row.canonical_key,
+      key,
+      tonality,
+      combo: get251(key, tonality),
+    };
+  }
+  return toStandardItem(mode, row);
+}
+
+function buildDeckFromGameItemIds(
+  mode: PracticeMode,
+  ids: string[],
+  byId: Map<string, GameItemRow>,
+): DeckItem[] {
+  const out: DeckItem[] = [];
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (!row) continue;
+    const item = gameItemRowToDeckItem(mode, row);
+    if (item) out.push(item);
+  }
+  return out;
 }
 
 function generateSequence(scaleType: string, count = 5): string[] {
@@ -799,8 +903,10 @@ function GradeButtons({ onGrade, loading, suggested, tr }: {
 
 export default function PracticeModePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mode } = useParams() as { mode: string };
   const practiceMode = mode as PracticeMode;
+  const resumeId = searchParams.get('resume');
 
   const [authed, setAuthed] = useState(false);
   const [ensured, setEnsured] = useState(false);
@@ -827,6 +933,9 @@ export default function PracticeModePage() {
   const [sessionXp, setSessionXp] = useState(0);
   const [lastEarnedXp, setLastEarnedXp] = useState<number | null>(null);
   const clearLastXpTimerRef = useRef<number | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [quitOpen, setQuitOpen] = useState(false);
+  const skipDeckBuildRef = useRef(false);
 
   const { pitch, cycle: cyclePitch } = usePitch();
   const semitoneOffset = pitch === 'bb' ? BB_OFFSET : pitch === 'eb' ? EB_OFFSET : 0;
@@ -890,8 +999,105 @@ export default function PracticeModePage() {
     });
   }, [authed, ensured, invalidate, gameSlug]);
 
+  // Resume an active session from ?resume= (deck + index from server config)
+  useEffect(() => {
+    if (!resumeId) {
+      setResumeError(null);
+      return;
+    }
+    if (!ensured || loadingAll || !allItems?.length) return;
+
+    let cancelled = false;
+    (async () => {
+      setResumeError(null);
+      const { data: row, error } = await supabase
+        .from('practice_sessions')
+        .select('id, status, config, is_cram, items_completed, correct_count, games!inner(slug)')
+        .eq('id', resumeId)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error || !row) {
+        setResumeError(t(lang).resumeSessionFailed);
+        return;
+      }
+      const slugFromSession = (row as { games?: { slug?: string } }).games?.slug;
+      if (!slugFromSession || GAME_SLUG_TO_PATH[slugFromSession] !== mode) {
+        setResumeError(t(lang).resumeSessionFailed);
+        return;
+      }
+      if ((row as { status?: string }).status !== 'active') {
+        setResumeError(t(lang).resumeSessionFailed);
+        return;
+      }
+
+      const rawConfig = ((row as { config?: Record<string, unknown> }).config ?? {}) as Record<string, unknown>;
+      const parsed = parseSessionConfig(rawConfig);
+      if (!parsed) {
+        setResumeError(t(lang).resumeSessionFailed);
+        return;
+      }
+
+      const ids = Array.isArray(rawConfig.deck_game_item_ids)
+        ? (rawConfig.deck_game_item_ids as string[])
+        : [];
+      const curIdxRaw = rawConfig.current_index;
+      const curIdx =
+        typeof curIdxRaw === 'number'
+          ? curIdxRaw
+          : typeof curIdxRaw === 'string'
+            ? Number.parseInt(curIdxRaw, 10)
+            : 0;
+      const seed =
+        typeof rawConfig.session_seed === 'string' && rawConfig.session_seed.length > 0
+          ? rawConfig.session_seed
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const byId = new Map(allItems.map((it) => [it.id, it]));
+      const built = buildDeckFromGameItemIds(practiceMode, ids, byId);
+      if (built.length === 0) {
+        setResumeError(t(lang).resumeSessionFailed);
+        return;
+      }
+
+      skipDeckBuildRef.current = true;
+      deckBuildKeyRef.current = `resume:${resumeId}`;
+      sessionSeedRef.current = seed;
+      sessionIdRef.current = (row as { id: string }).id;
+      reviewedCountRef.current = Number((row as { items_completed?: number }).items_completed ?? 0);
+      correctCountRef.current = Number((row as { correct_count?: number }).correct_count ?? 0);
+      setIsCram(Boolean((row as { is_cram?: boolean }).is_cram));
+      setSessionXp(0);
+      setLastEarnedXp(null);
+      if (clearLastXpTimerRef.current) {
+        window.clearTimeout(clearLastXpTimerRef.current);
+        clearLastXpTimerRef.current = null;
+      }
+      setSessionExpired(false);
+      setDeck(built);
+      setConfig(parsed);
+      if (curIdx >= built.length) {
+        setDone(true);
+        setIndex(Math.max(0, built.length - 1));
+      } else {
+        setDone(false);
+        setIndex(Math.max(0, curIdx));
+      }
+      setFlipped(false);
+      setUserAnswerTokens([]);
+      setScore(null);
+      setGradeError(null);
+      router.replace(`/practice/${mode}`);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeId, ensured, loadingAll, allItems, practiceMode, mode, router, lang]);
+
   // Build deck once game items + config are ready (new session only — not on query refetch after grading)
   useEffect(() => {
+    if (skipDeckBuildRef.current) return;
     if (!ensured || loadingDue || loadingAll || (shouldUseWeights && loadingWeights) || !dueItems || !allItems) return;
     if (!config) {
       deckBuildKeyRef.current = null;
@@ -925,14 +1131,15 @@ export default function PracticeModePage() {
   useEffect(() => {
     if (deck.length === 0 || sessionIdRef.current || !config) return;
     const dbMode = SLUG_TO_DB_MODE[practiceMode] ?? practiceMode;
-    const gameSlug = DB_MODE_TO_GAME_SLUG[dbMode] ?? 'full_scale';
+    const postGameSlug = DB_MODE_TO_GAME_SLUG[dbMode] ?? 'full_scale';
+    const deckSnapshot = deck;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return;
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          game_slug: gameSlug,
+          game_slug: postGameSlug,
           is_cram: isCram,
           config: {
             mode: dbMode,
@@ -949,9 +1156,21 @@ export default function PracticeModePage() {
         sessionIdRef.current = body.session.id;
         lastActivityAtRef.current = Date.now();
         setSessionExpired(false);
+        const deckIds = deckSnapshot.map((d) => d.gameItemId);
+        await fetch(`/api/sessions/${body.session.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            config: buildSessionConfigPayload(practiceMode, config, {
+              deck_game_item_ids: deckIds,
+              current_index: 0,
+              session_seed: sessionSeedRef.current,
+            }),
+          }),
+        });
       }
     });
-  }, [deck.length, practiceMode, isCram, config]);
+  }, [deck, practiceMode, isCram, config]);
 
   // Close session when done — write final score counts
   useEffect(() => {
@@ -987,37 +1206,6 @@ export default function PracticeModePage() {
       events.forEach((name) => window.removeEventListener(name, markActivity));
     };
   }, [done, sessionExpired, deck.length]);
-
-  // Auto-close inactive sessions after 30 minutes.
-  useEffect(() => {
-    if (!sessionIdRef.current || done || sessionExpired) return;
-
-    const timer = window.setInterval(() => {
-      if (Date.now() - lastActivityAtRef.current < SESSION_TIMEOUT_MS) return;
-
-      const sid = sessionIdRef.current;
-      if (!sid) return;
-
-      setSessionExpired(true);
-      setDone(true);
-
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        if (!session) return;
-        await fetch(`/api/sessions/${sid}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            ended_at: new Date().toISOString(),
-            items_completed: reviewedCountRef.current,
-            correct_count: correctCountRef.current,
-            status: 'abandoned',
-          }),
-        });
-      });
-    }, 1_000);
-
-    return () => window.clearInterval(timer);
-  }, [done, sessionExpired]);
 
   // Generate sequence for current card
   useEffect(() => {
@@ -1107,6 +1295,8 @@ export default function PracticeModePage() {
   }, [index]);
 
   const handleNewSession = useCallback(() => {
+    skipDeckBuildRef.current = false;
+    deckBuildKeyRef.current = null;
     setDeck([]);
     setIndex(0);
     setFlipped(false);
@@ -1125,8 +1315,12 @@ export default function PracticeModePage() {
     }
     lastActivityAtRef.current = Date.now();
     setSessionExpired(false);
+    setResumeError(null);
+    if (searchParams.get('resume')) {
+      router.replace(`/practice/${mode}`);
+    }
     setConfig(null); // always return to config screen
-  }, []);
+  }, [router, searchParams, mode]);
 
   const handleGrade = useCallback(async (grade: Grade) => {
     if (grading) return;
@@ -1154,14 +1348,34 @@ export default function PracticeModePage() {
       clearLastXpTimerRef.current = window.setTimeout(() => setLastEarnedXp(null), 1200);
       reviewedCountRef.current += 1;
       if (grade >= 3) correctCountRef.current += 1;
+      const nextIdx = index + 1;
+      const sidPersist = sessionIdRef.current;
+      if (sidPersist && config) {
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (authSession) {
+          await fetch(`/api/sessions/${sidPersist}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authSession.access_token}` },
+            body: JSON.stringify({
+              items_completed: reviewedCountRef.current,
+              correct_count: correctCountRef.current,
+              config: buildSessionConfigPayload(practiceMode, config, {
+                deck_game_item_ids: deck.map((d) => d.gameItemId),
+                current_index: nextIdx,
+                session_seed: sessionSeedRef.current,
+              }),
+            }),
+          });
+        }
+      }
       invalidate(gameSlug);
-      advanceCard(index + 1);
+      advanceCard(nextIdx);
     } catch (err) {
       setGradeError(err instanceof Error ? err.message : 'Grade failed');
     } finally {
       setGrading(false);
     }
-  }, [grading, deck, index, invalidate, advanceCard, practiceMode, isCram, gameSlug]);
+  }, [grading, deck, index, invalidate, advanceCard, practiceMode, isCram, gameSlug, config]);
 
   // Auto-grade using scoreAnswer's suggestedGrade, then advance.
   // Blank answer → grade 1 (Blackout). Used by the nav Next button.
@@ -1195,10 +1409,11 @@ export default function PracticeModePage() {
   handleGradeRef.current = handleGrade;
   handleNextRef.current = handleNext;
 
-  const itemsLoading = !authed || !ensured || loadingDue || loadingAll;
-  // Config screen shows for all modes while no config selected (items load in background)
-  const showConfig = authed && ensured && !config;
-  const loading = itemsLoading && !showConfig;
+  const itemsLoading = !authed || !ensured || loadingDue || loadingAll || (shouldUseWeights && loadingWeights);
+  const resumeBlocking = Boolean(resumeId) && !config && !resumeError;
+  // Config screen: new session, or resume failed (user can start fresh)
+  const showConfig = authed && ensured && !config && (!resumeId || Boolean(resumeError));
+  const loading = (itemsLoading || resumeBlocking) && !showConfig;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -1244,8 +1459,37 @@ export default function PracticeModePage() {
             >
               {tr.newSession}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setQuitOpen(true)}
+            >
+              {tr.practiceQuit}
+            </Button>
           </div>
         </header>
+
+        {quitOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="max-w-md space-y-4 rounded-xl border bg-card p-6 shadow-lg">
+              <h3 className="text-lg font-semibold">{tr.practiceQuitTitle}</h3>
+              <p className="text-sm text-muted-foreground">{tr.practiceQuitBody}</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setQuitOpen(false)}>
+                  {tr.practiceQuitCancel}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setQuitOpen(false);
+                    router.push('/dashboard');
+                  }}
+                >
+                  {tr.practiceQuitConfirm}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto p-4 sm:justify-center sm:gap-6 sm:p-6">
           {loading ? (
@@ -1259,7 +1503,14 @@ export default function PracticeModePage() {
               </Button>
             </div>
           ) : showConfig ? (
-            <ConfigScreen mode={practiceMode} onSelect={setConfig} tr={tr} />
+            <div className="w-full max-w-lg space-y-4">
+              {resumeError && (
+                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-600 dark:text-rose-400">
+                  {resumeError}
+                </div>
+              )}
+              <ConfigScreen mode={practiceMode} onSelect={setConfig} tr={tr} />
+            </div>
           ) : done ? (
             <DoneScreen total={deck.length} isCram={isCram} config={config} expired={sessionExpired} onNewSession={handleNewSession} tr={tr} />
           ) : deck.length === 0 ? (

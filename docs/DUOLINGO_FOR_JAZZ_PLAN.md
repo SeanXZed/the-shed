@@ -21,7 +21,7 @@ This plan is written *from the current codebase*, not from a blank slate. As of 
   - **XP** (derived from `game_events.grade`, shown on dashboard + inside practice)
 - **Foundation**: auth, i18n (EN/ZH), Concert/Bb/**Eb** transposition, audio playback (Tone.js)
 - **Shared theory**: `TheoryMapper`, `twoFiveOne`, `sm2`, `scaleDefinitions`, `transpose`
-- **Navigation UX**: top-level nav is `Dashboard` + `Practice` + `Library` (Scales/Chords); **Preferences** lives in user menu
+- **Navigation UX**: top-level nav is `Dashboard` + **The Shed** (structured track / curriculum placeholder at `/track`) + **Free Practice** + `Library` (Scales/Chords); **Preferences** lives in user menu
 
 **Implication:** “Game/event foundation” is not a future phase — it’s already present. The roadmap below is a re-baselined plan from this starting point.
 

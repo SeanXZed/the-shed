@@ -27,6 +27,7 @@ import { Music2, Flame, CheckCircle2, Clock } from "lucide-react"
 import { useLanguage } from "@/hooks/use-language"
 import { t } from "@/lib/translations"
 import { cn } from "@/lib/utils"
+import { GAME_SLUG_TO_PATH } from "@/lib/practiceGameRoutes"
 
 function formatDateTime(input: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -260,18 +261,28 @@ export default function DashboardPage() {
                           ? tr.sessionStatusAbandoned
                           : tr.sessionStatusCompleted
 
-                    return (
-                      <div
-                        key={session.id}
-                        className="rounded-lg border bg-card/50 px-4 py-3"
-                      >
+                    const practiceSegment = GAME_SLUG_TO_PATH[session.game_slug] ?? "full-scale"
+                    const resumeHref = `/practice/${practiceSegment}?resume=${encodeURIComponent(session.id)}`
+
+                    const rowClass = cn(
+                      "rounded-lg border bg-card/50 px-4 py-3",
+                      session.canResume && "transition-colors hover:border-ring/50 hover:bg-card",
+                    )
+
+                    const body = (
+                      <>
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <p className="font-medium">{session.game_title}</p>
                               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                                 {statusLabel}
                               </span>
+                              {session.canResume && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                  {tr.sessionContinue}
+                                </span>
+                              )}
                               {session.is_cram && (
                                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                                   {tr.sessionCram}
@@ -293,6 +304,16 @@ export default function DashboardPage() {
                           <span>{tr.sessionItems}: {session.items_completed}</span>
                           <span>{session.correct_count} / {session.items_completed}</span>
                         </div>
+                      </>
+                    )
+
+                    return session.canResume ? (
+                      <Link key={session.id} href={resumeHref} className={cn(rowClass, "block")}>
+                        {body}
+                      </Link>
+                    ) : (
+                      <div key={session.id} className={rowClass}>
+                        {body}
                       </div>
                     )
                   })}

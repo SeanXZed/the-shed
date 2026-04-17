@@ -2,9 +2,18 @@ import type { Lang } from '@/hooks/use-language';
 
 type TranslationMap = {
   appName: string;
-  appSubtitle: string; navDashboard: string; navPractice: string; navScales: string;
+  appSubtitle: string; navDashboard: string; navLearn: string; navPractice: string; navScales: string;
   navChords: string; navLibrary: string; navSettings: string; signOut: string;
   navSectionLabel: string;
+
+  learnTitle: string;
+  learnSubtitle: string;
+  learnPlaceholderP1: string;
+  learnPlaceholderP2: string;
+  learnBullet1: string;
+  learnBullet2: string;
+  learnBullet3: string;
+  learnGoFreePractice: string;
 
   authLoginTitle: string;
   authLoginSubtitle: string;
@@ -64,6 +73,13 @@ type TranslationMap = {
   doneCram: (n: number) => string;
   doneFree: (n: number) => string;
   newSession: string; backToModes: string;
+  practiceQuit: string;
+  practiceQuitTitle: string;
+  practiceQuitBody: string;
+  practiceQuitConfirm: string;
+  practiceQuitCancel: string;
+  resumeSessionFailed: string;
+  sessionContinue: string;
 
   pitchConcert: string;
   pitchBb: string;
@@ -112,13 +128,23 @@ const en: TranslationMap = {
   appName:            'The Shed',
   appSubtitle:        'Jazz Practice',
   navDashboard:       'Dashboard',
-  navPractice:        'Practice',
+  navLearn:           'The Shed',
+  navPractice:        'Free Practice',
   navLibrary:         'Library',
   navScales:          'Scales',
   navChords:          'Chords',
   navSettings:        'Preferences',
   navSectionLabel:    'Navigation',
   signOut:            'Sign out',
+
+  learnTitle:            'The Shed',
+  learnSubtitle:         'Guided tracks, nodes, and goals — coming soon.',
+  learnPlaceholderP1:      'This is where your structured path will live: tracks (e.g. scales, chords, sequences), nodes with clear objectives, and progress through a skill tree — built for serious jazz practice, not generic drills.',
+  learnPlaceholderP2:      'For now, use Free Practice to work on any game mode at your own pace. When this track ships, it will connect to the same games and telemetry you already use.',
+  learnBullet1:          'Tracks and nodes that map to real practice goals',
+  learnBullet2:          'Prerequisites and unlocks so you always know what to do next',
+  learnBullet3:          'Tutor-friendly visibility into what students are working on',
+  learnGoFreePractice:   'Go to Free Practice',
 
   authLoginTitle:        'Login to your account',
   authLoginSubtitle:     'Enter your email below to sign in.',
@@ -184,7 +210,7 @@ const en: TranslationMap = {
   sessionXp:          'XP',
 
   // ── Practice selector ────────────────────────────────────────────────────
-  practiceTitle:      'Practice',
+  practiceTitle:      'Free Practice',
   practiceSubtitle:   'Choose a mode to start your session.',
   modeStart:          'Start',
   modeFullScale:      'Full Scale',
@@ -253,6 +279,13 @@ const en: TranslationMap = {
   doneFree:           (n: number) => `Reviewed ${n} due item${n !== 1 ? 's' : ''}.`,
   newSession:         'New Session',
   backToModes:        'Back to modes',
+  practiceQuit:       'Quit',
+  practiceQuitTitle:  'Leave practice?',
+  practiceQuitBody:   'Your progress is saved. You can resume this session anytime from the dashboard.',
+  practiceQuitConfirm:'Leave',
+  practiceQuitCancel: 'Keep practicing',
+  resumeSessionFailed:'Could not resume this session. Start a new session instead.',
+  sessionContinue:    'Continue',
 
   pitchConcert:       'Concert',
   pitchBb:            'Bb',
@@ -315,16 +348,26 @@ const en: TranslationMap = {
 
 const zh: TranslationMap = {
   // ── Sidebar ──────────────────────────────────────────────────────────────
-  appName:            '爵士乐棚',
-  appSubtitle:        '乐理知识练习',
-  navDashboard:       '总览',
-  navPractice:        '练习',
+  appName:            'The Shed',
+  appSubtitle:        '爵士乐棚',
+  navDashboard:       '仪表盘',
+  navLearn:           '晋级之路',
+  navPractice:        '自由练习',
   navLibrary:         '曲库',
   navScales:          '音阶',
   navChords:          '和弦',
   navSettings:        '偏好设置',
   navSectionLabel:    '导航',
   signOut:            '退出登录',
+
+  learnTitle:            '晋级之路',
+  learnSubtitle:         '结构化路径、节点与目标 — 即将推出。',
+  learnPlaceholderP1:      '这里将承载你的系统练习路径：学习路径（如音阶、和弦、序列等）、目标清晰的节点，以及技能树式的进阶 — 为爵士练习深度设计，而不是泛泛的刷题。',
+  learnPlaceholderP2:      '目前请使用「自由练习」按自己的节奏练习任意模式。该路径上线后，将与你已在使用的游戏与练习数据打通。',
+  learnBullet1:          '与真实练习目标对应的学习路径与节点',
+  learnBullet2:          '前置与解锁，让你始终清楚下一步该练什么',
+  learnBullet3:          '便于老师了解学员在练的内容（后续版本）',
+  learnGoFreePractice:   '前往自由练习',
 
   authLoginTitle:        '登录账号',
   authLoginSubtitle:     '在下方输入邮箱和密码。',
@@ -390,7 +433,7 @@ const zh: TranslationMap = {
   sessionXp:          'XP',
 
   // ── Practice selector ────────────────────────────────────────────────────
-  practiceTitle:      '练习',
+  practiceTitle:      '自由练习',
   practiceSubtitle:   '选择一种模式开始练习。',
   modeStart:          '开始',
   modeFullScale:      '完整音阶',
@@ -459,6 +502,13 @@ const zh: TranslationMap = {
   doneFree:           (n: number) => `复习了 ${n} 题待复习内容。`,
   newSession:         '新练习',
   backToModes:        '返回模式',
+  practiceQuit:       '退出',
+  practiceQuitTitle:  '离开练习？',
+  practiceQuitBody:   '进度已保存。你可以随时在仪表盘继续此练习。',
+  practiceQuitConfirm:'离开',
+  practiceQuitCancel: '继续练习',
+  resumeSessionFailed:'无法恢复此练习，请开始新练习。',
+  sessionContinue:    '继续',
 
   pitchConcert:       '原调',
   pitchBb:            'Bb',

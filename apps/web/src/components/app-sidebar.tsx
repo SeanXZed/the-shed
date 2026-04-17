@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
   LayoutDashboard,
+  DoorOpen,
   Music2,
   BookOpen,
   Piano,
@@ -53,7 +54,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navItems = [
     { title: tr.navDashboard, url: "/dashboard", icon: LayoutDashboard },
-    { title: tr.navPractice,  url: "/practice",  icon: Music2 },
+    { title: tr.navLearn, url: "/track", icon: DoorOpen },
+    { title: tr.navPractice, url: "/practice", icon: Music2 },
   ]
 
   useEffect(() => {

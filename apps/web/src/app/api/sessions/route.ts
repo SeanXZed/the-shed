@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
-const SESSION_TIMEOUT_MINUTES = 30;
-
 const createSessionSchema = z.object({
   game_slug: z.enum(['full_scale', 'full_chord', 'sequence', 'progression_251', 'interval']),
   track_id: z.string().uuid().nullable().optional(),
@@ -23,19 +21,6 @@ export async function POST(request: Request) {
 
   const db = getSupabaseRlsClient(request);
   const { game_slug, track_id, node_id, config, is_cram } = parsed.data;
-  const staleBeforeIso = new Date(Date.now() - SESSION_TIMEOUT_MINUTES * 60_000).toISOString();
-
-  // Housekeeping: auto-close stale active sessions so games do not remain open-ended.
-  await db
-    .from('practice_sessions')
-    .update({
-      ended_at: new Date().toISOString(),
-      status: 'abandoned',
-    })
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .is('ended_at', null)
-    .lt('started_at', staleBeforeIso);
 
   const { data: game, error: gameError } = await db
     .from('games')
