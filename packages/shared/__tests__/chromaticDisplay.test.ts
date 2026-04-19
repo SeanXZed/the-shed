@@ -7,6 +7,7 @@ describe('formatNoteWithEnharmonicHint', () => {
     expect(formatNoteWithEnharmonicHint('Cb')).toBe('Cb(B)');
     expect(formatNoteWithEnharmonicHint('Fb')).toBe('Fb(E)');
     expect(formatNoteWithEnharmonicHint('B#')).toBe('B#(C)');
+    expect(formatNoteWithEnharmonicHint('Ebb')).toBe('Ebb(D)');
   });
 
   it('leaves common spellings unchanged', () => {

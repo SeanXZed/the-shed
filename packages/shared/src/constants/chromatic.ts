@@ -7,17 +7,24 @@ export const CHROMATIC = [
 // Enharmonic normalisation: maps any note name to its semitone index in CHROMATIC.
 const ENHARMONICS: Record<string, number> = {
   'C': 0, 'B#': 0,
+  'Cbb': 10,
   'C#': 1, 'Db': 1,
   'D': 2,
+  'Dbb': 0,
   'D#': 3, 'Eb': 3,
   'E': 4, 'Fb': 4,
+  'Ebb': 2,
   'F': 5, 'E#': 5,
+  'Fbb': 3,
   'F#': 6, 'Gb': 6,
   'G': 7,
+  'Gbb': 5,
   'G#': 8, 'Ab': 8,
   'A': 9,
+  'Abb': 7,
   'A#': 10, 'Bb': 10,
   'B': 11, 'Cb': 11,
+  'Bbb': 9,
 };
 
 export function noteToSemitone(note: string): number {
@@ -39,11 +46,18 @@ const ENHARMONIC_DISPLAY_HINTS: Record<string, string> = {
   Cb: 'B',
   Fb: 'E',
   'B#': 'C',
+  Cbb: 'Bb',
+  Dbb: 'C',
+  Ebb: 'D',
+  Fbb: 'Eb',
+  Gbb: 'F',
+  Abb: 'G',
+  Bbb: 'A',
 };
 
 /**
- * Display-only: append a common enharmonic in parentheses for E#, Cb, Fb, B#
- * (no space before `(` so it reads as one label, e.g. `Cb(B)`).
+ * Display-only: append a common enharmonic in parentheses for rare spellings
+ * (E#, Cb, Fb, B#, double flats; no space before `(` so it reads as one label, e.g. `Cb(B)`, `Ebb(D)`).
  * Other spellings are returned unchanged.
  */
 export function formatNoteWithEnharmonicHint(note: string): string {
