@@ -338,8 +338,6 @@ export default function StudioPage() {
 
   if (!authed) return null;
 
-  const activeStudio = ownerStudios.find((s) => s.id === activeStudioId) ?? null;
-
   return (
     <SidebarProvider>
       <AppSidebar />
