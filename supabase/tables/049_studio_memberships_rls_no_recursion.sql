@@ -1,22 +1,6 @@
--- public.studio_memberships
--- Users in a studio with a role.
+-- studio_memberships RLS must not subquery studio_memberships inside policies (infinite recursion).
+-- Use SECURITY DEFINER helpers that read the table without RLS.
 
-create table if not exists public.studio_memberships (
-  studio_id  uuid        not null references public.studios(id) on delete cascade,
-  user_id    uuid        not null references auth.users(id) on delete cascade,
-  role       text        not null,
-  created_at timestamptz not null default now(),
-
-  primary key (studio_id, user_id),
-  constraint studio_memberships_role_valid check (role in ('owner', 'admin', 'tutor', 'student'))
-);
-
-create index if not exists studio_memberships_user_id_idx on public.studio_memberships (user_id);
-create index if not exists studio_memberships_studio_id_idx on public.studio_memberships (studio_id);
-
-alter table public.studio_memberships enable row level security;
-
--- Helpers: policies must NOT subquery studio_memberships directly (PostgreSQL RLS recursion).
 create or replace function public.is_member_of_studio(p_studio_id uuid, p_user_id uuid)
 returns boolean
 language sql
@@ -47,13 +31,11 @@ $$;
 grant execute on function public.is_member_of_studio(uuid, uuid) to authenticated;
 grant execute on function public.member_role_in_studio(uuid, uuid) to authenticated;
 
--- Read: members can read membership rows within the same studio.
 drop policy if exists "studio_memberships_select_member" on public.studio_memberships;
 create policy "studio_memberships_select_member" on public.studio_memberships
   for select
   using (public.is_member_of_studio(studio_id, auth.uid()));
 
--- Insert: admins/owners can add members; tutors can add students.
 drop policy if exists "studio_memberships_insert_admin_or_tutor" on public.studio_memberships;
 create policy "studio_memberships_insert_admin_or_tutor" on public.studio_memberships
   for insert
@@ -65,14 +47,12 @@ create policy "studio_memberships_insert_admin_or_tutor" on public.studio_member
     )
   );
 
--- Update: owners/admins can change roles; tutors cannot elevate roles.
 drop policy if exists "studio_memberships_update_admin" on public.studio_memberships;
 create policy "studio_memberships_update_admin" on public.studio_memberships
   for update
   using (public.member_role_in_studio(studio_id, auth.uid()) in ('owner', 'admin'))
   with check (public.member_role_in_studio(studio_id, auth.uid()) in ('owner', 'admin'));
 
--- Delete: owners/admins can remove any member; users can remove themselves (leave studio).
 drop policy if exists "studio_memberships_delete_admin_or_self" on public.studio_memberships;
 create policy "studio_memberships_delete_admin_or_self" on public.studio_memberships
   for delete
@@ -80,4 +60,3 @@ create policy "studio_memberships_delete_admin_or_self" on public.studio_members
     user_id = auth.uid()
     or public.member_role_in_studio(studio_id, auth.uid()) in ('owner', 'admin')
   );
-

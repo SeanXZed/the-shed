@@ -14,6 +14,7 @@ create index if not exists studios_created_by_user_id_idx on public.studios (cre
 alter table public.studios enable row level security;
 
 -- Insert: authenticated user can create a studio; must set themselves as creator.
+-- Stricter policy (tutor/Superadmin only) replaces this in 040_profiles.sql after `is_tutor()` exists.
 drop policy if exists "studios_insert_own" on public.studios;
 create policy "studios_insert_own" on public.studios
   for insert

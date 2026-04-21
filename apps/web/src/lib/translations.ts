@@ -4,6 +4,8 @@ type TranslationMap = {
   appName: string;
   appSubtitle: string; navDashboard: string; navLearn: string; navPractice: string; navScales: string;
   navChords: string; navLibrary: string; navSettings: string; signOut: string;
+  navSystemSettings: string; navStudio: string; navTutorStudents: string; navStudentTutor: string;
+  navStudioSection: string;
   navSectionLabel: string;
 
   learnTitle: string;
@@ -109,6 +111,75 @@ type TranslationMap = {
   settingsPitchLabel: string;
   settingsPitchHelp: string;
   settingsSaved: string;
+  settingsProfileSection: string;
+  settingsFullName: string;
+  settingsNickname: string;
+  settingsAccountSection: string;
+  settingsEmailLabel: string;
+  settingsNewEmail: string;
+  settingsNewPassword: string;
+  settingsSaveProfile: string;
+  settingsProfileSaved: string;
+  settingsAccountHint: string;
+
+  systemSettingsTitle: string;
+  systemSettingsSubtitle: string;
+  systemUsersEmail: string;
+  systemUsersCreated: string;
+  systemUsersRole: string;
+  systemRoleStudent: string;
+  systemRoleTutor: string;
+  systemRoleSuperadmin: string;
+  systemRoleSelfHint: string;
+  systemRoleSelfForbidden: string;
+  systemRoleLastSuperadmin: string;
+  systemUsersDelete: string;
+  systemUsersCreate: string;
+  systemUsersPasswordOptional: string;
+  systemUsersEmpty: string;
+  systemUnauthorized: string;
+
+  studioTitle: string;
+  studioSubtitle: string;
+  studioName: string;
+  studioSlugHint: string;
+  studioCreate: string;
+  studioCreated: string;
+  studioCreateNeedTutor: string;
+  studioMyStudios: string;
+  studioDelete: string;
+  studioDeleteConfirm: string;
+  studioDeleted: string;
+  studioTutorRequests: string;
+  studioStudentRequests: string;
+  studioAccept: string;
+  studioReject: string;
+  studioNoRequests: string;
+  studioJoinSection: string;
+  studioJoinHelp: string;
+  studioRequestAsTutor: string;
+  studioRequestAsStudent: string;
+  studioJoinAlreadyMember: string;
+  studioJoinRequestSent: string;
+  studioJoinLookupFirst: string;
+  studioJoinNotFound: string;
+
+  tutorStudentsTitle: string;
+  tutorStudentsSubtitle: string;
+  tutorPending: string;
+  tutorAccepted: string;
+  tutorAccept: string;
+  tutorReject: string;
+  tutorNoStudents: string;
+
+  studentTutorTitle: string;
+  studentTutorSubtitle: string;
+  studentStudioSlug: string;
+  studentLookupStudio: string;
+  studentRequestJoin: string;
+  studentRequestSent: string;
+  studentPickTutor: string;
+  studentRequestTutor: string;
 
   configDirection: string;
   dirUp: string;
@@ -149,7 +220,12 @@ const en: TranslationMap = {
   navLibrary:         'Library',
   navScales:          'Scales',
   navChords:          'Chords',
-  navSettings:        'Preferences',
+  navSettings:        'User settings',
+  navSystemSettings:  'System settings',
+  navStudio:          'Studio',
+  navTutorStudents:   'My students',
+  navStudentTutor:    'My tutor',
+  navStudioSection:   'Studio & Teaching',
   navSectionLabel:    'Navigation',
   signOut:            'Sign out',
 
@@ -332,11 +408,81 @@ const en: TranslationMap = {
   pitchTooltipEb:     'Showing Eb transposition — click to cycle pitch',
   pitchTooltipConcert:'Showing concert pitch — click to cycle pitch',
 
-  settingsTitle:      'Settings',
-  settingsSubtitle:   'Personal preferences for your account.',
+  settingsTitle:      'User settings',
+  settingsSubtitle:   'Profile, account, and practice preferences.',
   settingsPitchLabel: 'Instrument key',
   settingsPitchHelp:  'Sets the default display pitch (you can still switch any time during practice).',
   settingsSaved:      'Saved.',
+  settingsProfileSection: 'Profile',
+  settingsFullName:   'Full name',
+  settingsNickname: 'Nickname',
+  settingsAccountSection: 'Account',
+  settingsEmailLabel: 'Signed-in email',
+  settingsNewEmail:   'New email',
+  settingsNewPassword: 'New password (optional)',
+  settingsSaveProfile: 'Save profile',
+  settingsProfileSaved: 'Profile saved.',
+  settingsAccountHint: 'Changing email or password signs you in with the new credentials where applicable.',
+
+  systemSettingsTitle: 'System settings',
+  systemSettingsSubtitle: 'Superadmin: manage users and platform access.',
+  systemUsersEmail: 'Email',
+  systemUsersCreated: 'Created',
+  systemUsersRole: 'Role',
+  systemRoleStudent: 'Student',
+  systemRoleTutor: 'Tutor',
+  systemRoleSuperadmin: 'Superadmin',
+  systemRoleSelfHint: 'Another superadmin must change your role.',
+  systemRoleSelfForbidden: 'You cannot change your own role.',
+  systemRoleLastSuperadmin: 'At least one superadmin must remain.',
+  systemUsersDelete: 'Delete',
+  systemUsersCreate: 'Create user',
+  systemUsersPasswordOptional: 'Password (optional)',
+  systemUsersEmpty: 'No users returned.',
+  systemUnauthorized: 'You do not have access to this page.',
+
+  studioTitle:        'Studio',
+  studioSubtitle:     'Create a studio (you become owner), join another studio by slug, or resolve join requests if you are an owner.',
+  studioName:         'Studio name',
+  studioSlugHint:     'URL slug is generated from the name (letters, numbers, hyphens).',
+  studioCreate:       'Create studio',
+  studioCreated:      'Studio created.',
+  studioCreateNeedTutor:
+    'Only platform tutors (or Superadmins) can create a studio. Ask a Superadmin to enable tutor access for your account in System settings.',
+  studioMyStudios:    'My studios',
+  studioDelete:       'Delete studio',
+  studioDeleteConfirm:'Delete this studio? This will remove all memberships and pending requests.',
+  studioDeleted:      'Studio deleted.',
+  studioTutorRequests: 'Tutor join requests',
+  studioStudentRequests: 'Student join requests',
+  studioAccept:       'Accept',
+  studioReject:       'Reject',
+  studioNoRequests:   'No pending requests.',
+  studioJoinSection:  'Join an existing studio',
+  studioJoinHelp:     'Enter the studio slug (from the owner). If you are not a member yet, request access as a tutor or a student. The owner approves on this page under join requests.',
+  studioRequestAsTutor: 'Request as tutor',
+  studioRequestAsStudent: 'Request as student',
+  studioJoinAlreadyMember: 'You are already a member of this studio.',
+  studioJoinRequestSent: 'Request sent. Wait for the owner to approve.',
+  studioJoinLookupFirst: 'Look up a studio first.',
+  studioJoinNotFound: 'No studio with that slug.',
+
+  tutorStudentsTitle: 'My students',
+  tutorStudentsSubtitle: 'Accept or reject student requests; review accepted rosters.',
+  tutorPending:       'Pending',
+  tutorAccepted:      'Accepted',
+  tutorAccept:        'Accept',
+  tutorReject:        'Reject',
+  tutorNoStudents:    'No students yet.',
+
+  studentTutorTitle:  'My tutor',
+  studentTutorSubtitle: 'Join a studio, then request a tutor.',
+  studentStudioSlug:  'Studio name or slug',
+  studentLookupStudio: 'Find studio',
+  studentRequestJoin: 'Request to join studio',
+  studentRequestSent: 'Request sent.',
+  studentPickTutor:   'Request lesson link',
+  studentRequestTutor: 'Send request',
 
   configDirection:    'Direction',
   dirUp:              'Up',
@@ -394,7 +540,12 @@ const zh: TranslationMap = {
   navLibrary:         '曲库',
   navScales:          '音阶',
   navChords:          '和弦',
-  navSettings:        '偏好设置',
+  navSettings:        '用户设置',
+  navSystemSettings:  '系统设置',
+  navStudio:          '工作室',
+  navTutorStudents:   '我的学生',
+  navStudentTutor:    '我的老师',
+  navStudioSection:   '工作室与教学',
   navSectionLabel:    '导航',
   signOut:            '退出登录',
 
@@ -577,11 +728,81 @@ const zh: TranslationMap = {
   pitchTooltipEb:     '当前为 Eb 移调显示 — 点击循环切换',
   pitchTooltipConcert:'当前为原调显示 — 点击循环切换',
 
-  settingsTitle:      '设置',
-  settingsSubtitle:   '账号的个人偏好设置。',
+  settingsTitle:      '用户设置',
+  settingsSubtitle:   '个人资料、账号与练习偏好。',
   settingsPitchLabel: '乐器调性',
   settingsPitchHelp:  '设置默认显示调性（练习时仍可随时切换）。',
   settingsSaved:      '已保存。',
+  settingsProfileSection: '资料',
+  settingsFullName:   '姓名',
+  settingsNickname:   '昵称',
+  settingsAccountSection: '账号',
+  settingsEmailLabel: '当前登录邮箱',
+  settingsNewEmail:   '新邮箱',
+  settingsNewPassword: '新密码（可选）',
+  settingsSaveProfile: '保存资料',
+  settingsProfileSaved: '已保存。',
+  settingsAccountHint: '修改邮箱或密码后，请按提示重新登录（若项目开启邮箱验证）。',
+
+  systemSettingsTitle: '系统设置',
+  systemSettingsSubtitle: '超级管理员：管理用户与平台权限。',
+  systemUsersEmail: '邮箱',
+  systemUsersCreated: '创建时间',
+  systemUsersRole: '角色',
+  systemRoleStudent: '学生',
+  systemRoleTutor: '导师',
+  systemRoleSuperadmin: '超级管理员',
+  systemRoleSelfHint: '需由其他超级管理员修改你的角色。',
+  systemRoleSelfForbidden: '不能修改自己的角色。',
+  systemRoleLastSuperadmin: '至少保留一名超级管理员。',
+  systemUsersDelete: '删除',
+  systemUsersCreate: '创建用户',
+  systemUsersPasswordOptional: '密码（可选）',
+  systemUsersEmpty: '暂无用户。',
+  systemUnauthorized: '无权访问此页面。',
+
+  studioTitle:        '工作室',
+  studioSubtitle:     '创建工作室（你将成为拥有者）、通过标识加入其他工作室，或作为拥有者处理加入申请。',
+  studioName:         '工作室名称',
+  studioSlugHint:     'URL 标识由名称自动生成（字母、数字、连字符）。',
+  studioCreate:       '创建工作室',
+  studioCreated:      '已创建工作室。',
+  studioCreateNeedTutor:
+    '只有平台导师（或超级管理员）可以创建工作室。请在系统设置中请超级管理员为你的账号开启导师权限。',
+  studioMyStudios:    '我的工作室',
+  studioDelete:       '删除工作室',
+  studioDeleteConfirm:'确定删除该工作室？这会删除所有成员关系与待处理申请。',
+  studioDeleted:      '已删除工作室。',
+  studioTutorRequests: '老师加入申请',
+  studioStudentRequests: '学生加入申请',
+  studioAccept:       '同意',
+  studioReject:       '拒绝',
+  studioNoRequests:   '暂无待处理申请。',
+  studioJoinSection:  '加入已有工作室',
+  studioJoinHelp:     '标识（拥有者提供）。若还不是成员，可申请为老师或学生；拥有者在本页上方的加入申请中处理。',
+  studioRequestAsTutor: '申请为老师',
+  studioRequestAsStudent: '申请为学生',
+  studioJoinAlreadyMember: '你已是该工作室成员。',
+  studioJoinRequestSent: '申请已发送，等待拥有者通过。',
+  studioJoinLookupFirst: '请先查找工作室。',
+  studioJoinNotFound: '未找到该标识的工作室。',
+
+  tutorStudentsTitle: '我的学生',
+  tutorStudentsSubtitle: '处理学生的上课关联申请；查看已通过名单。',
+  tutorPending:       '待处理',
+  tutorAccepted:      '已通过',
+  tutorAccept:        '同意',
+  tutorReject:        '拒绝',
+  tutorNoStudents:    '暂无学生。',
+
+  studentTutorTitle:  '我的老师',
+  studentTutorSubtitle: '加入工作室后再向老师发起关联请求。',
+  studentStudioSlug:  '工作室名称或标识',
+  studentLookupStudio: '查找工作室',
+  studentRequestJoin: '申请加入工作室',
+  studentRequestSent: '申请已发送。',
+  studentPickTutor:   '向老师发起关联',
+  studentRequestTutor: '发送请求',
 
   configDirection:    '方向',
   dirUp:              '上行',

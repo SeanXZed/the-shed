@@ -14,8 +14,13 @@ import {
   ChevronsUpDown,
   Music,
   ChevronDown,
+  Building2,
+  Shield,
+  Users,
+  GraduationCap,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
+import { useProfile } from "@/hooks/use-profile"
 import { useLanguage } from "@/hooks/use-language"
 import { t } from "@/lib/translations"
 import { cn } from "@/lib/utils"
@@ -49,6 +54,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isMobile } = useSidebar()
   const [user, setUser] = useState<User | null>(null)
   const [libraryOpen, setLibraryOpen] = useState(true)
+  const [hasTutorRole, setHasTutorRole] = useState(false)
+  const [hasStudentRole, setHasStudentRole] = useState(false)
+  const { profile } = useProfile()
   const { lang, toggle } = useLanguage()
   const tr = t(lang)
 
@@ -61,6 +69,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
   }, [])
+
+  useEffect(() => {
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setHasTutorRole(false)
+        setHasStudentRole(false)
+        return
+      }
+      const { data } = await supabase.from("studio_memberships").select("role").eq("user_id", user.id)
+      const r = new Set((data ?? []).map((row) => row.role))
+      setHasTutorRole(r.has("tutor"))
+      setHasStudentRole(r.has("student"))
+    })()
+  }, [user?.id])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -138,6 +163,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>{tr.navStudioSection}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton render={<a href="/studio" />} tooltip={tr.navStudio}>
+                  <Building2 />
+                  <span>{tr.navStudio}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {profile?.is_superadmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton render={<a href="/system-settings" />} tooltip={tr.navSystemSettings}>
+                    <Shield />
+                    <span>{tr.navSystemSettings}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {hasTutorRole && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton render={<a href="/tutor/students" />} tooltip={tr.navTutorStudents}>
+                    <Users />
+                    <span>{tr.navTutorStudents}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {hasStudentRole && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton render={<a href="/student/tutor" />} tooltip={tr.navStudentTutor}>
+                    <GraduationCap />
+                    <span>{tr.navStudentTutor}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
             </SidebarMenu>
           </SidebarGroupContent>

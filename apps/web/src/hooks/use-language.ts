@@ -1,17 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { startTransition, useState, useEffect } from 'react';
 
 export type Lang = 'en' | 'zh';
 
+function readLangFromStorage(): Lang {
+  if (typeof window === 'undefined') return 'en';
+  const v = localStorage.getItem('lang') as Lang | null;
+  return v === 'zh' || v === 'en' ? v : 'en';
+}
+
+/**
+ * SSR and the first client render must agree: never read localStorage in useState's
+ * initializer, or the server (always 'en') and client (stored lang) will mismatch.
+ */
 export function useLanguage() {
-  const [lang, setLang] = useState<Lang>(() => {
-    if (typeof window === 'undefined') return 'en';
-    return (localStorage.getItem('lang') as Lang) ?? 'en';
-  });
+  const [lang, setLang] = useState<Lang>('en');
 
   useEffect(() => {
-    const handler = () => setLang((localStorage.getItem('lang') as Lang) ?? 'en');
+    startTransition(() => {
+      setLang(readLangFromStorage());
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setLang(readLangFromStorage());
     window.addEventListener('language-change', handler);
     return () => window.removeEventListener('language-change', handler);
   }, []);

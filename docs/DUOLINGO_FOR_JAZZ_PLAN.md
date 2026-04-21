@@ -21,7 +21,7 @@ This plan is written *from the current codebase*, not from a blank slate. As of 
   - **XP** (derived from `game_events.grade`, shown on dashboard + inside practice)
 - **Foundation**: auth, i18n (EN/ZH), Concert/Bb/**Eb** transposition, audio playback (Tone.js)
 - **Shared theory**: `TheoryMapper`, `twoFiveOne`, `sm2`, `scaleDefinitions`, `transpose`
-- **Navigation UX**: top-level nav is `Dashboard` + **The Shed** (`/track`; `/learn` redirects here) + **Free Practice** + `Library` (Scales/Chords); **Preferences** lives in user menu
+- **Navigation UX**: top-level nav is `Dashboard` + **The Shed** (`/track`; `/learn` redirects here) + **Free Practice** + `Library` (Scales/Chords); **User settings** in user menu; sidebar **Studio & teaching** (`/studio`, role-gated `/tutor/students`, `/student/tutor`, Superadmin-only `/system-settings`)
 - **Curriculum shell (demo only)**: **`/track/jazz-101`** — sectioned path UI (18 lesson nodes), first lesson opens **`/track/jazz-101/lesson/1`** (placeholder: 12 chromatic notes from `@the-shed/shared`). **No** server-backed `user_node_state`, authoring, or completion gating yet — UI and routing only.
 
 **Implication:** “Game/event foundation” is not a future phase — it’s already present. The roadmap below is a re-baselined plan from this starting point.
@@ -144,6 +144,57 @@ Even before RBAC/tenancy is shipped, we should support **basic per-user preferen
   - fallback order: `studio_user_settings` → `user_settings` → local defaults
 
 Until RBAC is implemented, instrument pitch (Concert / B♭ / E♭) is driven by a **client toggle** with **localStorage**; logged-in users also **best-effort sync** to `user_settings.pitch_mode` when available, so DB-backed defaults are optional, not required for basic use.
+
+### 4.3 Roles & access (Superadmin, studio owner, tutor, student) — shipped 2026-04
+
+**Naming (product vs SQL)**
+
+- **Superadmin** — platform operator (`profiles.is_superadmin`). Manages all auth users via **server-only** Admin API (`SUPABASE_SERVICE_ROLE_KEY`). UI: **System settings** (`/system-settings`), hidden from non-superadmins.
+- **Platform tutor** — `profiles.is_tutor`. **Superadmin** grants or revokes it in System settings. Only **Superadmins** and **platform tutors** may **create studios** (RLS on `studios` insert); everyone else registers as a non-tutor and can still join studios via slug / requests.
+- **Studio `admin`** — reserved in `studio_memberships.role` for future large-school orgs; **no UI yet** and not assigned by default.
+- **Studio roles in use**: `owner` (creator of a studio), `tutor`, `student`. Owner is the primary studio manager; **studio** creation is **not** a client-only membership insert (see bootstrap trigger below).
+
+**SQL apply order** (migration `supabase/migrations/0004_roles.sql` is ordering-only; run files in this sequence):
+
+1. `supabase/tables/040_profiles.sql` — `profiles` (including `is_tutor`), `is_superadmin()` / `is_tutor()`, `handle_new_user` trigger on `auth.users`, RLS, `profiles_prevent_platform_role_escalation` trigger, and **strict** `studios_insert_own` (only Superadmin or platform tutor may create studios; replaces the permissive policy from `020_studios.sql`). (If your environment rejects triggers on `auth.users`, run this block in the Supabase SQL editor with sufficient privileges.)
+2. `supabase/tables/041_tutor_student_links_status.sql` — `tutor_student_links.status` (`pending` | `accepted` | `rejected`), default `accepted` for tutor-created rows.
+3. `supabase/tables/042_studio_tutor_join_requests.sql` — tutors request to join a studio; `get_studio_by_slug()` for discovery.
+4. `supabase/tables/043_rls_tutor_practice_profiles.sql` — tutors read linked students’ `practice_sessions` / `game_events` / `user_game_item_state` when link is **accepted**; Superadmin read-all on those tables; extra `tutor_student_links` policies (student insert pending, tutor update, etc.).
+5. `supabase/tables/044_studio_owner_bootstrap.sql` — after insert on `studios`, insert `studio_memberships` (`owner`) for `created_by_user_id`.
+6. `supabase/tables/045_studio_student_join_requests.sql` — students request to join a studio.
+7. `supabase/tables/046_profiles_studio_peers.sql` — members of the same studio can read each other’s `profiles` (rosters).
+8. `supabase/tables/047_profiles_join_request_visibility.sql` — owners see requester profiles for pending join requests; tutors see student profiles for pending tutor–student links.
+9. `supabase/tables/048_profiles_select_split.sql` — split `profiles` SELECT policies so “own row” does not depend on `is_superadmin()` (fixes client reads / sidebar Superadmin visibility).
+10. `supabase/tables/049_studio_memberships_rls_no_recursion.sql` — replace `studio_memberships` policies that subqueried the same table (PostgreSQL: “infinite recursion detected in policy”). Uses `is_member_of_studio` / `member_role_in_studio` (`SECURITY DEFINER`). Ordering: `supabase/migrations/0005_studio_memberships_rls.sql`.
+
+**Environment**
+
+- **Public (browser) Supabase URL + anon/publishable key:** either `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, or **`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`** — `apps/web/next.config.ts` maps the latter into `NEXT_PUBLIC_*` at build time. Do **not** put the service secret in `NEXT_PUBLIC_*`.
+- `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY` — **server only** (same role key; the app accepts either). Required for Superadmin user management (`/api/admin/users`, `GET`/`POST`/`DELETE`/`PATCH`).
+
+**First Superadmin (manual)**
+
+After deploying SQL, promote one user:
+
+```sql
+update public.profiles
+set is_superadmin = true
+where user_id = (select id from auth.users where email = 'you@example.com');
+```
+
+**Web routes**
+
+| Route | Who |
+|--------|-----|
+| `/settings` | User settings (profile, pitch, email/password) |
+| `/system-settings` | Superadmin only |
+| `/studio` | Create studio (owner bootstrap); **join existing studio** by slug (request as tutor or student); owner resolves **join requests** here |
+| `/tutor/students` | Tutors: pending/accepted `tutor_student_links` |
+| `/student/tutor` | Students: find studio by slug, request studio membership, then request tutor link |
+
+**Sidebar**: “Studio & Teaching” group — **System settings** only if `profile.is_superadmin`; **My students** if `studio_memberships.role = tutor`; **My tutor** if `student`.
+
+**Superadmin vs studio roles**: System settings only toggles **platform** `profiles.is_superadmin`. It does **not** assign `tutor` / `student` / `owner` inside a studio — that is **studio membership**, managed by the **studio owner** (accepting join requests on `/studio`, or future invite flows), not by platform Superadmin.
 
 ---
 
@@ -353,7 +404,7 @@ This is the **living execution order**. It is intentionally re-baselined from th
 | 5 | **Game-based state split (schema migration)** | ✅ Done | `games`/`game_items`/`user_game_item_state`/`game_events` + legacy cleanup |
 | 6 | **Curriculum MVP (tracks → nodes)** | 🟡 In progress | **Shell:** Jazz 101 UI + routes (`/track/jazz-101`, lesson 1 placeholder). **Still to ship:** DB-backed nodes/progress, bind lessons to existing game modes, authoring or seed pipeline |
 | 7 | **Content authoring admin** | Pending | Non-hardcoded authoring flow for tracks/nodes/game params |
-| 8 | **Tutor v1 (read-only)** | Pending | Roster + read-only student progress views (leverages phases 1/3/4 data) |
+| 8 | **Tutor roster & read-only progress** | ✅ Done | Roles + RLS: studios, memberships, join requests, `tutor_student_links` with status; tutor reads linked students’ practice via RLS; **Superadmin** user admin; UI: `/settings`, `/system-settings`, `/studio`, `/tutor/students`, `/student/tutor` (see §4.3) |
 | 9 | **Google OAuth / regional auth** | Pending | OAuth login for global users |
 | 10+ | **WeChat mini program** | Later | Large scope; gated on Phase 9 + stable API contract |
 | 11 | **Daily lick / scheduled games** | Later | Scheduled content + completion; add background jobs when needed |
@@ -392,4 +443,4 @@ Before implementing phases that change schema or authorization, the following de
 
 ## 11. Document ownership
 
-Update [`DUOLINGO_FOR_JAZZ_PLAN.md`](DUOLINGO_FOR_JAZZ_PLAN.md) when vision shifts (new clients, new roles, or a deliberate move to a standalone API). Keep **implementation details** (commands, file paths, SM-2 formula) in [`../README.md`](../README.md) and [`../supabase/tables/`](../supabase/tables/); keep **phase order and scope** in **section 8** above.
+Update [`DUOLINGO_FOR_JAZZ_PLAN.md`](DUOLINGO_FOR_JAZZ_PLAN.md) when vision shifts (new clients, new roles, or a deliberate move to a standalone API). Keep **implementation details** (commands, file paths, SM-2 formula) in [`../README.md`](../README.md) and [`../supabase/tables/`](../supabase/tables/); keep **phase order and scope** in **section 8** above. **Roles / Superadmin / studio flows** are summarized in **§4.3** with SQL apply order and routes.
