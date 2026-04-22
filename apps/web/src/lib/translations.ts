@@ -197,6 +197,11 @@ type TranslationMap = {
   studioPracticeResultsSubtitle: string;
   studioPracticeResultsLoading: string;
   studioPracticeResultsEmpty: string;
+  studioPracticeStatsSessions: string;
+  studioPracticeStatsCompleted: string;
+  studioPracticeStatsAccuracy: string;
+  studioPracticeStatsLastPracticed: string;
+  studioPracticeStatsByGame: string;
   studioPracticeSessionStarted: string;
   studioPracticeSessionGame: string;
   studioPracticeSessionResult: string;
@@ -541,6 +546,11 @@ const en: TranslationMap = {
   studioPracticeResultsSubtitle: 'Recent sessions for this student.',
   studioPracticeResultsLoading: 'Loading…',
   studioPracticeResultsEmpty: 'No practice sessions yet.',
+  studioPracticeStatsSessions: 'Sessions',
+  studioPracticeStatsCompleted: 'Completed',
+  studioPracticeStatsAccuracy: 'Accuracy',
+  studioPracticeStatsLastPracticed: 'Last practiced',
+  studioPracticeStatsByGame: 'By game',
   studioPracticeSessionStarted: 'Started',
   studioPracticeSessionGame: 'Game',
   studioPracticeSessionResult: 'Result',
@@ -901,6 +911,11 @@ const zh: TranslationMap = {
   studioPracticeResultsSubtitle: '该学生最近的练习记录。',
   studioPracticeResultsLoading: '加载中…',
   studioPracticeResultsEmpty: '暂无练习记录。',
+  studioPracticeStatsSessions: '练习次数',
+  studioPracticeStatsCompleted: '已完成',
+  studioPracticeStatsAccuracy: '正确率',
+  studioPracticeStatsLastPracticed: '最近练习',
+  studioPracticeStatsByGame: '按游戏统计',
   studioPracticeSessionStarted: '开始时间',
   studioPracticeSessionGame: '游戏',
   studioPracticeSessionResult: '结果',

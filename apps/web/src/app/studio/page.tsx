@@ -1014,65 +1014,7 @@ export default function StudioPage() {
                             )}
                           </div>
 
-                          <Dialog
-                            open={practiceOpen}
-                            onOpenChange={(open) => {
-                              setPracticeOpen(open);
-                              if (!open) {
-                                setPracticeTarget(null);
-                                setPracticeSessions([]);
-                                setPracticeLoading(false);
-                              }
-                            }}
-                          >
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>
-                                  {practiceTarget
-                                    ? `${tr.studioPracticeResultsTitle}: ${practiceTarget.nickname}`
-                                    : tr.studioPracticeResultsTitle}
-                                </DialogTitle>
-                                <DialogDescription>{tr.studioPracticeResultsSubtitle}</DialogDescription>
-                              </DialogHeader>
-
-                              <div className="mt-4">
-                                {practiceLoading ? (
-                                  <p className="text-sm text-muted-foreground">{tr.studioPracticeResultsLoading}</p>
-                                ) : practiceSessions.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">{tr.studioPracticeResultsEmpty}</p>
-                                ) : (
-                                  <div className="max-h-[60vh] overflow-auto rounded-lg border">
-                                    <table className="w-full text-sm">
-                                      <thead className="bg-muted/30 text-muted-foreground">
-                                        <tr>
-                                          <th className="px-3 py-2 text-left font-medium">{tr.studioPracticeSessionStarted}</th>
-                                          <th className="px-3 py-2 text-left font-medium">{tr.studioPracticeSessionGame}</th>
-                                          <th className="px-3 py-2 text-left font-medium">{tr.studioPracticeSessionResult}</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {practiceSessions.map((s) => {
-                                          const acc = s.items_completed > 0 ? Math.round((s.correct_count / s.items_completed) * 100) : 0;
-                                          return (
-                                            <tr key={s.id} className="border-t">
-                                              <td className="px-3 py-2">{formatDay(s.started_at)}</td>
-                                              <td className="px-3 py-2">
-                                                <span className="font-medium">{s.game_title}</span>
-                                                <span className="ml-2 text-xs text-muted-foreground">{s.game_slug}</span>
-                                              </td>
-                                              <td className="px-3 py-2 text-muted-foreground">
-                                                {s.correct_count}/{s.items_completed} ({acc}%)
-                                              </td>
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                          {/* practice results dialog is rendered once at page level */}
                         </CardContent>
                       </Card>
                     ) : (
@@ -1090,6 +1032,135 @@ export default function StudioPage() {
               </Tabs>
             </section>
           )}
+
+          <Dialog
+            open={practiceOpen}
+            onOpenChange={(open) => {
+              setPracticeOpen(open);
+              if (!open) {
+                setPracticeTarget(null);
+                setPracticeSessions([]);
+                setPracticeLoading(false);
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {practiceTarget
+                    ? `${tr.studioPracticeResultsTitle}: ${practiceTarget.nickname}`
+                    : tr.studioPracticeResultsTitle}
+                </DialogTitle>
+                <DialogDescription>{tr.studioPracticeResultsSubtitle}</DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-4">
+                {practiceLoading ? (
+                  <p className="text-sm text-muted-foreground">{tr.studioPracticeResultsLoading}</p>
+                ) : practiceSessions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{tr.studioPracticeResultsEmpty}</p>
+                ) : (
+                  (() => {
+                    const completed = practiceSessions.filter((s) => s.status === 'completed').length;
+                    const totalItems = practiceSessions.reduce((sum, s) => sum + (s.items_completed || 0), 0);
+                    const totalCorrect = practiceSessions.reduce((sum, s) => sum + (s.correct_count || 0), 0);
+                    const accuracy = totalItems > 0 ? Math.round((totalCorrect / totalItems) * 100) : 0;
+                    const lastPracticed = practiceSessions[0]?.started_at ? formatDay(practiceSessions[0].started_at) : '—';
+
+                    const byGame = new Map<string, { title: string; items: number; correct: number; sessions: number }>();
+                    for (const s of practiceSessions) {
+                      const key = s.game_slug || s.game_title;
+                      const cur = byGame.get(key) ?? { title: s.game_title, items: 0, correct: 0, sessions: 0 };
+                      cur.items += s.items_completed || 0;
+                      cur.correct += s.correct_count || 0;
+                      cur.sessions += 1;
+                      byGame.set(key, cur);
+                    }
+                    const topGames = [...byGame.entries()]
+                      .map(([slug, v]) => ({ slug, ...v }))
+                      .sort((a, b) => b.sessions - a.sessions)
+                      .slice(0, 4);
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-4">
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">{tr.studioPracticeStatsSessions}</div>
+                            <div className="mt-0.5 text-sm font-medium">{practiceSessions.length}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">{tr.studioPracticeStatsCompleted}</div>
+                            <div className="mt-0.5 text-sm font-medium">{completed}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">{tr.studioPracticeStatsAccuracy}</div>
+                            <div className="mt-0.5 text-sm font-medium">{accuracy}%</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">{tr.studioPracticeStatsLastPracticed}</div>
+                            <div className="mt-0.5 text-sm font-medium">{lastPracticed}</div>
+                          </div>
+                        </div>
+
+                        {topGames.length > 0 && (
+                          <div className="rounded-lg border p-3">
+                            <div className="text-xs font-medium text-muted-foreground">{tr.studioPracticeStatsByGame}</div>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              {topGames.map((g) => {
+                                const acc = g.items > 0 ? Math.round((g.correct / g.items) * 100) : 0;
+                                return (
+                                  <div key={g.slug} className="rounded-md bg-muted/20 px-3 py-2">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <div className="min-w-0 truncate text-sm font-medium">{g.title}</div>
+                                      <div className="shrink-0 text-xs text-muted-foreground">{g.sessions}×</div>
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                      {g.correct}/{g.items} ({acc}%)
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="max-h-[45vh] overflow-auto rounded-lg border">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted/30 text-muted-foreground">
+                              <tr>
+                                <th className="px-3 py-2 text-center font-medium">{tr.studioPracticeSessionStarted}</th>
+                                <th className="px-3 py-2 text-center font-medium">{tr.studioPracticeSessionGame}</th>
+                                <th className="px-3 py-2 text-center font-medium">{tr.studioPracticeSessionResult}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {practiceSessions.map((s) => {
+                                const acc = s.items_completed > 0 ? Math.round((s.correct_count / s.items_completed) * 100) : 0;
+                                return (
+                                  <tr key={s.id} className="border-t">
+                                    <td className="px-3 py-2 text-center">{formatDay(s.started_at)}</td>
+                                    <td className="px-3 py-2 text-center">
+                                      <div className="inline-flex max-w-full flex-col items-center">
+                                        <span className="max-w-full truncate font-medium">{s.game_title}</span>
+                                        <span className="max-w-full truncate text-xs text-muted-foreground">{s.game_slug}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-center text-muted-foreground">
+                                      {s.correct_count}/{s.items_completed} ({acc}%)
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Dialog
             open={deleteConfirmOpen}
