@@ -4,6 +4,7 @@ import { Inter, Instrument_Serif } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/components/providers";
+import { ToastProvider } from "@/components/ui/toast";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -32,7 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={cn(inter.variable, instrumentSerif.variable)}>
       <body className="font-sans">
         <Providers>
-          <TooltipProvider>{children}</TooltipProvider>
+          <ToastProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </ToastProvider>
         </Providers>
       </body>
     </html>

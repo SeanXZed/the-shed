@@ -20,6 +20,7 @@ export function SignupForm({
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
+  const [registrationRole, setRegistrationRole] = useState<"student" | "tutor">("student")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
@@ -36,7 +37,11 @@ export function SignupForm({
       return
     }
     setLoading(true)
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { registration_role: registrationRole } },
+    })
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -107,6 +112,43 @@ export function SignupForm({
             onChange={(e) => setConfirm(e.target.value)}
             required
           />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label id="reg-role-label">{tr.authRegisterAs}</Label>
+          <div
+            className="flex rounded-lg border p-1"
+            role="group"
+            aria-labelledby="reg-role-label"
+          >
+            <button
+              type="button"
+              onClick={() => setRegistrationRole("student")}
+              className={cn(
+                "flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                registrationRole === "student"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tr.authRegisterStudent}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegistrationRole("tutor")}
+              className={cn(
+                "flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                registrationRole === "tutor"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tr.authRegisterTutor}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {registrationRole === "student" ? tr.authRegisterHintStudent : tr.authRegisterHintTutor}
+          </p>
         </div>
 
         {error && (

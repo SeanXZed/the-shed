@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 
 type Row = {
   id: string;
+  nickname?: string | null;
   email: string | undefined;
   created_at: string | undefined;
   is_superadmin: boolean;
@@ -247,23 +248,24 @@ export default function SystemSettingsPage() {
           <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-left">
+                <tr className="border-b bg-muted/40 text-center">
+                  <th className="p-3 font-medium">{tr.settingsNickname}</th>
                   <th className="p-3 font-medium">{tr.systemUsersEmail}</th>
                   <th className="p-3 font-medium">{tr.systemUsersCreated}</th>
                   <th className="p-3 font-medium">{tr.systemUsersRole}</th>
-                  <th className="p-3 font-medium" />
+                  <th className="p-3 font-medium">{tr.systemUsersOperation}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="p-4 text-muted-foreground">
+                    <td colSpan={5} className="p-4 text-muted-foreground text-center">
                       …
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-4 text-muted-foreground">
+                    <td colSpan={5} className="p-4 text-muted-foreground text-center">
                       {tr.systemUsersEmpty}
                     </td>
                   </tr>
@@ -273,11 +275,12 @@ export default function SystemSettingsPage() {
                     const isSelf = meId !== null && u.id === meId;
                     return (
                       <tr key={u.id} className="border-b border-border/60">
-                        <td className="p-3">{u.email ?? u.id}</td>
-                        <td className="p-3 text-muted-foreground">
+                        <td className="p-3 text-center">{u.nickname || '—'}</td>
+                        <td className="p-3 text-center">{u.email ?? u.id}</td>
+                        <td className="p-3 text-center text-muted-foreground">
                           {u.created_at ? new Date(u.created_at).toLocaleString() : '—'}
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 text-center">
                           <select
                             className={selectClass}
                             value={current}
@@ -294,7 +297,7 @@ export default function SystemSettingsPage() {
                             <option value="superadmin">{tr.systemRoleSuperadmin}</option>
                           </select>
                         </td>
-                        <td className="p-3 text-right">
+                        <td className="p-3 text-center">
                           <Button type="button" variant="destructive" size="sm" onClick={() => void removeUser(u.id)}>
                             {tr.systemUsersDelete}
                           </Button>

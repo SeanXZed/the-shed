@@ -13,13 +13,17 @@ export async function GET(request: Request) {
   const ids = data.users.map((u) => u.id);
   const { data: profs } = await svc
     .from('profiles')
-    .select('user_id, is_superadmin, is_tutor')
+    .select('user_id, nickname, is_superadmin, is_tutor')
     .in('user_id', ids);
 
   const rowByUser = new Map(
     (profs ?? []).map((p) => [
       p.user_id,
-      { is_superadmin: p.is_superadmin, is_tutor: p.is_tutor },
+      {
+        nickname: p.nickname,
+        is_superadmin: p.is_superadmin,
+        is_tutor: p.is_tutor,
+      },
     ]),
   );
 
@@ -29,6 +33,7 @@ export async function GET(request: Request) {
       id: u.id,
       email: u.email,
       created_at: u.created_at,
+      nickname: row?.nickname ?? null,
       is_superadmin: row?.is_superadmin ?? false,
       is_tutor: row?.is_tutor ?? false,
     };

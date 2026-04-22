@@ -57,6 +57,11 @@ type TranslationMap = {
   authPasswordMismatch: string;
   authPasswordMinLength: string;
   authImageAlt: string;
+  authRegisterAs: string;
+  authRegisterStudent: string;
+  authRegisterTutor: string;
+  authRegisterHintStudent: string;
+  authRegisterHintTutor: string;
 
   welcomeBack: string; welcomeSub: string; quickStart: string;
   statDueToday: string; statDueSub: string; statStreak: string; statStreakSub: string;
@@ -127,6 +132,7 @@ type TranslationMap = {
   systemUsersEmail: string;
   systemUsersCreated: string;
   systemUsersRole: string;
+  systemUsersOperation: string;
   systemRoleStudent: string;
   systemRoleTutor: string;
   systemRoleSuperadmin: string;
@@ -161,8 +167,41 @@ type TranslationMap = {
   studioRequestAsStudent: string;
   studioJoinAlreadyMember: string;
   studioJoinRequestSent: string;
+  studioJoinRequestToast: string;
+  studioJoinRequestAlreadyPending: string;
   studioJoinLookupFirst: string;
   studioJoinNotFound: string;
+  studioCreateOrJoinTitle: string;
+  studioJoinStudentTitle: string;
+  studioRoleOwner: string;
+  studioRoleAdmin: string;
+  studioRoleTutor: string;
+  studioRoleStudent: string;
+  studioYourRole: string;
+  studioPendingRequestsAll: string;
+  studioViewJoinRequests: string;
+  studioApprovedMembersTitle: string;
+  studioMembersTitle: string;
+  studioMembersNone: string;
+  studioFilterAll: string;
+  studioFilterTutors: string;
+  studioFilterStudents: string;
+  studioMembersNickname: string;
+  studioMembersRole: string;
+  studioMembersJoinedSince: string;
+  studioMembersOperation: string;
+  studioViewPracticeResults: string;
+  studioSendDm: string;
+  studioDmCopied: string;
+  studioPracticeResultsTitle: string;
+  studioPracticeResultsSubtitle: string;
+  studioPracticeResultsLoading: string;
+  studioPracticeResultsEmpty: string;
+  studioPracticeSessionStarted: string;
+  studioPracticeSessionGame: string;
+  studioPracticeSessionResult: string;
+  studioDeleteCancel: string;
+  studioDeleteConfirmButton: string;
 
   tutorStudentsTitle: string;
   tutorStudentsSubtitle: string;
@@ -284,6 +323,12 @@ const en: TranslationMap = {
   authPasswordMismatch:  'Passwords do not match.',
   authPasswordMinLength: 'Password must be at least 8 characters.',
   authImageAlt:          'Jazz musician',
+  authRegisterAs:        'I am signing up as',
+  authRegisterStudent:   'Student',
+  authRegisterTutor:     'Tutor',
+  authRegisterHintStudent:
+    'Students can join existing studios and change participation after joining.',
+  authRegisterHintTutor: 'Tutor can create and join existing studios.',
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        'Welcome back',
@@ -429,6 +474,7 @@ const en: TranslationMap = {
   systemUsersEmail: 'Email',
   systemUsersCreated: 'Created',
   systemUsersRole: 'Role',
+  systemUsersOperation: 'Operation',
   systemRoleStudent: 'Student',
   systemRoleTutor: 'Tutor',
   systemRoleSuperadmin: 'Superadmin',
@@ -442,7 +488,8 @@ const en: TranslationMap = {
   systemUnauthorized: 'You do not have access to this page.',
 
   studioTitle:        'Studio',
-  studioSubtitle:     'Create a studio (you become owner), join another studio by slug, or resolve join requests if you are an owner.',
+  studioSubtitle:
+    'Studios are shared spaces for tutors and students to manage memberships and review learning progress.',
   studioName:         'Studio name',
   studioSlugHint:     'URL slug is generated from the name (letters, numbers, hyphens).',
   studioCreate:       'Create studio',
@@ -459,13 +506,46 @@ const en: TranslationMap = {
   studioReject:       'Reject',
   studioNoRequests:   'No pending requests.',
   studioJoinSection:  'Join an existing studio',
-  studioJoinHelp:     'Enter the studio slug (from the owner). If you are not a member yet, request access as a tutor or a student. The owner approves on this page under join requests.',
+  studioJoinHelp:     'Enter the studio name or slug to join.',
   studioRequestAsTutor: 'Request as tutor',
   studioRequestAsStudent: 'Request as student',
   studioJoinAlreadyMember: 'You are already a member of this studio.',
   studioJoinRequestSent: 'Request sent. Wait for the owner to approve.',
+  studioJoinRequestToast: "Your request has been sent. Please wait for owner's approval.",
+  studioJoinRequestAlreadyPending: 'You already have a pending request for this studio.',
   studioJoinLookupFirst: 'Look up a studio first.',
   studioJoinNotFound: 'No studio with that slug.',
+  studioCreateOrJoinTitle: 'Create a studio',
+  studioJoinStudentTitle: 'Join a studio',
+  studioRoleOwner: 'Owner',
+  studioRoleAdmin: 'Admin',
+  studioRoleTutor: 'Tutor',
+  studioRoleStudent: 'Student',
+  studioYourRole: 'Your role',
+  studioPendingRequestsAll: 'Pending join requests',
+  studioViewJoinRequests: 'View join requests',
+  studioApprovedMembersTitle: 'Approved members',
+  studioMembersTitle: 'Studio Members',
+  studioMembersNone: 'No approved tutors or students yet.',
+  studioFilterAll: 'All',
+  studioFilterTutors: 'Tutors',
+  studioFilterStudents: 'Students',
+  studioMembersNickname: 'Nickname',
+  studioMembersRole: 'Role',
+  studioMembersJoinedSince: 'Joined Since',
+  studioMembersOperation: 'Operation',
+  studioViewPracticeResults: 'View practice results',
+  studioSendDm: 'Send message',
+  studioDmCopied: 'Copied user id (DM coming soon).',
+  studioPracticeResultsTitle: 'Practice results',
+  studioPracticeResultsSubtitle: 'Recent sessions for this student.',
+  studioPracticeResultsLoading: 'Loading…',
+  studioPracticeResultsEmpty: 'No practice sessions yet.',
+  studioPracticeSessionStarted: 'Started',
+  studioPracticeSessionGame: 'Game',
+  studioPracticeSessionResult: 'Result',
+  studioDeleteCancel: 'Cancel',
+  studioDeleteConfirmButton: 'Delete studio',
 
   tutorStudentsTitle: 'My students',
   tutorStudentsSubtitle: 'Accept or reject student requests; review accepted rosters.',
@@ -604,6 +684,11 @@ const zh: TranslationMap = {
   authPasswordMismatch:  '两次输入的密码不一致。',
   authPasswordMinLength: '密码至少需要 8 个字符。',
   authImageAlt:          '爵士乐手',
+  authRegisterAs:        '我注册为',
+  authRegisterStudent:   '学生',
+  authRegisterTutor:     '老师',
+  authRegisterHintStudent: '学生可加入已有工作室，加入后仍可切换其它工作室。',
+  authRegisterHintTutor: '老师可以创建新工作室，也可申请加入已有工作室。',
 
   // ── Dashboard ────────────────────────────────────────────────────────────
   welcomeBack:        '欢迎回来',
@@ -749,6 +834,7 @@ const zh: TranslationMap = {
   systemUsersEmail: '邮箱',
   systemUsersCreated: '创建时间',
   systemUsersRole: '角色',
+  systemUsersOperation: '操作',
   systemRoleStudent: '学生',
   systemRoleTutor: '导师',
   systemRoleSuperadmin: '超级管理员',
@@ -762,7 +848,8 @@ const zh: TranslationMap = {
   systemUnauthorized: '无权访问此页面。',
 
   studioTitle:        '工作室',
-  studioSubtitle:     '创建工作室（你将成为拥有者）、通过标识加入其他工作室，或作为拥有者处理加入申请。',
+  studioSubtitle:
+    '工作室是导师与学生共同协作的空间，用于管理成员关系并查看学习进度。',
   studioName:         '工作室名称',
   studioSlugHint:     'URL 标识由名称自动生成（字母、数字、连字符）。',
   studioCreate:       '创建工作室',
@@ -779,13 +866,46 @@ const zh: TranslationMap = {
   studioReject:       '拒绝',
   studioNoRequests:   '暂无待处理申请。',
   studioJoinSection:  '加入已有工作室',
-  studioJoinHelp:     '标识（拥有者提供）。若还不是成员，可申请为老师或学生；拥有者在本页上方的加入申请中处理。',
+  studioJoinHelp:     '输入工作室名称或标识来申请加入。',
   studioRequestAsTutor: '申请为老师',
   studioRequestAsStudent: '申请为学生',
   studioJoinAlreadyMember: '你已是该工作室成员。',
   studioJoinRequestSent: '申请已发送，等待拥有者通过。',
+  studioJoinRequestToast: '你的申请已发送，请等待拥有者审核。',
+  studioJoinRequestAlreadyPending: '你已提交过加入申请，请等待拥有者处理。',
   studioJoinLookupFirst: '请先查找工作室。',
   studioJoinNotFound: '未找到该标识的工作室。',
+  studioCreateOrJoinTitle: '创建或加入工作室',
+  studioJoinStudentTitle: '加入工作室',
+  studioRoleOwner: '拥有者',
+  studioRoleAdmin: '管理员',
+  studioRoleTutor: '老师',
+  studioRoleStudent: '学生',
+  studioYourRole: '你的身份',
+  studioPendingRequestsAll: '待处理加入申请',
+  studioViewJoinRequests: '查看加入申请',
+  studioApprovedMembersTitle: '已通过成员',
+  studioMembersTitle: '工作室成员',
+  studioMembersNone: '暂无已通过的老师或学生。',
+  studioFilterAll: '全部',
+  studioFilterTutors: '老师',
+  studioFilterStudents: '学生',
+  studioMembersNickname: '昵称',
+  studioMembersRole: '角色',
+  studioMembersJoinedSince: '加入时间',
+  studioMembersOperation: '操作',
+  studioViewPracticeResults: '查看练习结果',
+  studioSendDm: '发送私信',
+  studioDmCopied: '已复制用户 ID（私信功能即将上线）。',
+  studioPracticeResultsTitle: '练习结果',
+  studioPracticeResultsSubtitle: '该学生最近的练习记录。',
+  studioPracticeResultsLoading: '加载中…',
+  studioPracticeResultsEmpty: '暂无练习记录。',
+  studioPracticeSessionStarted: '开始时间',
+  studioPracticeSessionGame: '游戏',
+  studioPracticeSessionResult: '结果',
+  studioDeleteCancel: '取消',
+  studioDeleteConfirmButton: '删除工作室',
 
   tutorStudentsTitle: '我的学生',
   tutorStudentsSubtitle: '处理学生的上课关联申请；查看已通过名单。',
