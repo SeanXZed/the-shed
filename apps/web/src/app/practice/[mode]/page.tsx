@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
@@ -17,6 +17,8 @@ import {
   transposeNotes,
   BB_OFFSET,
   EB_OFFSET,
+  noteToSemitone,
+  semitoneToNote,
   formatNoteWithEnharmonicHint,
   formatNotesWithEnharmonicHints,
   type ChordQuality,
@@ -284,6 +286,77 @@ function weightedSample<T>(
   return out;
 }
 
+function hashString(s: string): number {
+  // FNV-1a 32-bit
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function seededShuffle<T>(items: readonly T[], seed: string): T[] {
+  // xorshift32
+  let x = hashString(seed) || 0x12345678;
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i--) {
+    x ^= x << 13; x >>>= 0;
+    x ^= x >> 17; x >>>= 0;
+    x ^= x << 5;  x >>>= 0;
+    const j = x % (i + 1);
+    const tmp = next[i] as T;
+    next[i] = next[j] as T;
+    next[j] = tmp;
+  }
+  return next;
+}
+
+function stratifiedWeightedSample<T, F extends string>(
+  items: readonly T[],
+  count: number,
+  familyOf: (item: T) => F | null,
+  weightOf: (item: T) => number,
+): T[] {
+  if (items.length === 0 || count <= 0) return [];
+
+  const byFamily = new Map<F, T[]>();
+  for (const it of items) {
+    const f = familyOf(it);
+    if (!f) continue;
+    const arr = byFamily.get(f) ?? [];
+    arr.push(it);
+    byFamily.set(f, arr);
+  }
+
+  // If we couldn't form any families, fall back.
+  if (byFamily.size === 0) return weightedSample(items, count, weightOf);
+
+  const families = shuffled(Array.from(byFamily.keys()));
+  const out: T[] = [];
+
+  // Pick at least one from as many distinct families as we can.
+  const distinctTarget = Math.min(count, families.length);
+  const picked = new Set<T>();
+  for (const f of families) {
+    if (out.length >= distinctTarget) break;
+    const pool = byFamily.get(f) ?? [];
+    if (pool.length === 0) continue;
+    const [one] = weightedSample(pool, 1, weightOf);
+    if (!one) continue;
+    out.push(one);
+    picked.add(one);
+  }
+
+  if (out.length >= count) return out.slice(0, count);
+
+  // Fill remaining, avoiding already-picked when possible.
+  const remaining = items.filter((it) => !picked.has(it));
+  const fillSource = remaining.length > 0 ? remaining : items;
+  out.push(...weightedSample(fillSource, count - out.length, weightOf));
+  return out.slice(0, count);
+}
+
 function buildDeck(
   mode: PracticeMode,
   dueItems: GameItemRow[],
@@ -351,12 +424,15 @@ function buildDeck(
       const parts = it.canonical_key.split('::');
       return rootsSet.has(parts[1] as Root);
     });
-    const chosen = weightedSample(
+    const chosen = stratifiedWeightedSample(
       rootItems,
       SESSION_SIZE,
       (it) => {
-        return weights?.[it.canonical_key] ?? 1;
+        const parts = it.canonical_key.split('::');
+        if (mode === 'full-chord') return (parts[0] ?? null) as string | null; // chordQuality
+        return (parts[0] ?? null) as string | null; // scaleType
       },
+      (it) => weights?.[it.canonical_key] ?? 1,
     );
     return { deck: chosen.map((it) => toStandardItem(mode, it)).filter(Boolean) as DeckItem[], isCram: false };
   }
@@ -365,12 +441,15 @@ function buildDeck(
   const source = dueItems.length > 0 ? dueItems : allItems;
   const isCram = dueItems.length === 0;
   return {
-    deck: weightedSample(
+    deck: stratifiedWeightedSample(
       source,
       SESSION_SIZE,
       (it) => {
-        return weights?.[it.canonical_key] ?? 1;
+        const parts = it.canonical_key.split('::');
+        if (mode === 'full-chord') return (parts[0] ?? null) as string | null; // chordQuality
+        return (parts[0] ?? null) as string | null; // scaleType
       },
+      (it) => weights?.[it.canonical_key] ?? 1,
     ).map((it) => toStandardItem(mode, it)).filter(Boolean) as DeckItem[],
     isCram,
   };
@@ -467,44 +546,48 @@ function generateSequence(scaleType: string, count = 5): string[] {
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 
 interface AnswerScore {
-  correct: Set<string>;   // canonical notes the user got right
+  correct: Set<number>;   // pitch classes (0-11) the user got right
   missing: string[];      // expected notes the user missed
   wrong: string[];        // user notes that don't match any expected
   total: number;          // total expected notes
   suggestedGrade: Grade;
 }
 
-// Enharmonic equivalents → canonical form (flats preferred, F# retained)
-const ENHARMONIC: Record<string, string> = {
-  'C#': 'Db', 'D#': 'Eb', 'E#': 'F',
-  'G#': 'Ab', 'A#': 'Bb', 'B#': 'C',
-  'Cb': 'B',  'Fb': 'E',  'Gb': 'F#',
-};
-
-function canonicalNote(raw: string): string {
+function toPitchClass(raw: string): number | null {
   const s = raw.trim();
-  if (!s) return '';
-  const n = s[0]!.toUpperCase() + s.slice(1).toLowerCase();
-  return ENHARMONIC[n] ?? n;
+  if (!s) return null;
+  try {
+    return ((noteToSemitone(s) % 12) + 12) % 12;
+  } catch {
+    return null;
+  }
+}
+
+/** Normalize any enharmonic spelling to a single “common” label for display (e.g. Ebb → D). */
+function toCommonNote(raw: string): string | null {
+  const pc = toPitchClass(raw);
+  return pc === null ? null : semitoneToNote(pc);
 }
 
 function parseNotes(input: string): string[] {
   return input
     .split(/[\s,/|+\n]+/)
-    .map(canonicalNote)
-    .filter(n => n.length > 0);
+    .map((t) => toCommonNote(t))
+    .filter((n): n is string => Boolean(n));
 }
 
 const NOTE_INPUT_SCHEMA = z
   .string()
   .trim()
-  .regex(/^[A-Ga-g](?:b|#)?$/, 'Invalid note');
+  .regex(/^[A-Ga-g](?:(?:bb|##)|b|#)?$/, 'Invalid note');
 
 function canonicalizeNoteInput(raw: string): string {
   const s = raw.trim();
   if (!s) return '';
   const letter = s[0]!.toUpperCase();
-  const acc = (s[1] ?? '').toLowerCase();
+  const acc = s.slice(1).toLowerCase();
+  if (acc === 'bb') return `${letter}bb`;
+  if (acc === '##') return `${letter}##`;
   if (acc === 'b') return `${letter}b`;
   if (acc === '#') return `${letter}#`;
   return letter;
@@ -512,13 +595,19 @@ function canonicalizeNoteInput(raw: string): string {
 
 function scoreAnswer(userInput: string, expectedNotes: string[]): AnswerScore {
   const parsed = parseNotes(userInput);
-  const expectedCanon = expectedNotes.map(canonicalNote);
-  const expectedSet = new Set(expectedCanon);
-  const parsedSet = new Set(parsed.map(canonicalNote));
+  const expectedPcs = expectedNotes.map((n) => toPitchClass(n)).filter((x): x is number => x !== null);
+  const expectedSet = new Set(expectedPcs);
+  const parsedPcs = parsed.map((n) => toPitchClass(n)).filter((x): x is number => x !== null);
+  const parsedSet = new Set(parsedPcs);
 
-  const correct = new Set([...parsedSet].filter(n => expectedSet.has(n)));
-  const missing = expectedNotes.filter(n => !parsedSet.has(canonicalNote(n)));
-  const wrong   = [...parsedSet].filter(n => !expectedSet.has(n));
+  const correct = new Set([...parsedSet].filter((pc) => expectedSet.has(pc)));
+  const missing = expectedNotes.filter((n) => {
+    const pc = toPitchClass(n);
+    return pc === null ? true : !parsedSet.has(pc);
+  });
+  const wrong = [...parsedSet]
+    .filter((pc) => !expectedSet.has(pc))
+    .map((pc) => semitoneToNote(pc));
   const total   = expectedNotes.length;
   const pct     = total > 0 ? correct.size / total : 0;
 
@@ -836,8 +925,8 @@ function AnswerReview({ userAnswer, score, tr }: { userAnswer: string; score: An
         {tokens.length === 0 ? (
           <span className="text-sm text-muted-foreground/50">—</span>
         ) : tokens.map((token, i) => {
-          const canon = canonicalNote(token);
-          const isCorrect = correct.has(canon);
+          const pc = toPitchClass(token);
+          const isCorrect = pc !== null && correct.has(pc);
           return (
             <span
               key={i}
@@ -975,25 +1064,32 @@ export default function PracticeModePage() {
     });
   }, [router]);
 
-  // Ensure games/items/state exist (once per session)
+  // Ensure games/items/state exist (once per mount while signed in). Runs only on `/practice/[mode]`, not on `/practice` hub.
   useEffect(() => {
     if (!authed || ensured) return;
     getSessionDeduped().then(async ({ data: { session } }) => {
-      if (!session) return;
+      if (!session) {
+        setEnsureError('Not signed in (no session for ensure).');
+        return;
+      }
       setEnsureError(null);
-      const headers = { Authorization: `Bearer ${session.access_token}` };
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
 
-      async function mustPost(url: string) {
-        const res = await fetch(url, { method: 'POST', headers });
+      async function mustPost(path: string) {
+        const url = typeof window !== 'undefined' ? new URL(path, window.location.origin).toString() : path;
+        const res = await fetch(url, { method: 'POST', headers, cache: 'no-store' });
         if (res.ok) return;
         const body = await res.json().catch(() => ({})) as { error?: string; detail?: string };
-        throw new Error(body.detail ?? body.error ?? `${url} failed (${res.status})`);
+        throw new Error(body.detail ?? body.error ?? `${path} failed (${res.status})`);
       }
 
       try {
         await mustPost('/api/games/ensure');
         await mustPost('/api/game-items/ensure');
-        await mustPost('/api/user-game-item-state/ensure');
+        await mustPost(`/api/user-game-item-state/ensure?game_slug=${encodeURIComponent(gameSlug)}`);
       } catch (e) {
         setEnsureError(e instanceof Error ? e.message : 'Failed to set up practice items');
         return;
@@ -1502,7 +1598,13 @@ export default function PracticeModePage() {
             <div className="w-full max-w-lg space-y-3 rounded-xl border bg-card p-6 text-center shadow-sm">
               <p className="text-lg font-semibold">Setup failed</p>
               <p className="text-sm text-muted-foreground">{ensureError}</p>
-              <Button variant="outline" onClick={() => { setEnsured(false); setEnsureError(null); }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEnsured(false);
+                  setEnsureError(null);
+                }}
+              >
                 Retry
               </Button>
             </div>
@@ -1722,6 +1824,18 @@ function PracticeCard({
             values={userAnswerTokens}
             onChange={onAnswerChange}
           />
+          <NotePad
+            semitoneOffset={semitoneOffset}
+            seed={`${item.type === 'standard' ? item.canonicalKey : item.type === 'interval' ? item.canonicalKey : item.canonicalKey}::${expectedCount}`}
+            disabled={grading}
+            onPick={(note) => {
+              const next = [...userAnswerTokens];
+              const idx = next.findIndex((x) => !String(x ?? '').trim());
+              if (idx === -1) return;
+              next[idx] = note;
+              onAnswerChange(next);
+            }}
+          />
         </div>
       ) : (
         <AnswerReview userAnswer={userAnswerTokens.join(' ')} score={score} tr={tr} />
@@ -1776,6 +1890,46 @@ function PracticeCard({
         >
           {current === total ? tr.finishPractice : tr.nextCard}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function NotePad({
+  semitoneOffset,
+  seed,
+  disabled,
+  onPick,
+}: {
+  semitoneOffset: number;
+  seed: string;
+  disabled: boolean;
+  onPick: (note: string) => void;
+}) {
+  const notes = useMemo(() => {
+    const pcs = Array.from({ length: 12 }, (_, i) => i);
+    const shuffled = seededShuffle(pcs, seed);
+    return shuffled.map((pc) => semitoneToNote(pc + semitoneOffset));
+  }, [seed, semitoneOffset]);
+
+  return (
+    <div className="mt-3 rounded-lg border bg-muted/10 p-3">
+      <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+        {notes.map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(n)}
+            className={cn(
+              'h-10 rounded-md border bg-background text-sm font-mono font-semibold tabular-nums transition-colors',
+              'hover:bg-muted/40 active:bg-muted/60',
+              'disabled:pointer-events-none disabled:opacity-50',
+            )}
+          >
+            {n}
+          </button>
+        ))}
       </div>
     </div>
   );

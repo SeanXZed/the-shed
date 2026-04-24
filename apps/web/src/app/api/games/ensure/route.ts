@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
+import { getUserId } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 
 const GAMES: { slug: string; title: string }[] = [
   { slug: 'full_scale', title: 'Scale Game' },
@@ -13,9 +14,10 @@ export async function POST(request: Request) {
   const userId = await getUserId(request);
   if (!userId) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
-  const db = getSupabaseRlsClient(request);
+  // Catalog writes use the service role so RLS need not allow arbitrary users
+  // to insert/update global `games` rows (see `supabase/tables/035_game_seed_policies.sql`).
+  const db = createServiceRoleClient();
 
-  // Best-effort upsert. Requires temporary insert policies during migration.
   const { error } = await db
     .from('games')
     .upsert(GAMES, { onConflict: 'slug' });

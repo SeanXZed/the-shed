@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 // Browser code can only read NEXT_PUBLIC_* from process.env at build time.
 // Map unprefixed Supabase vars (SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) so .env.local
-// can omit NEXT_PUBLIC_* for the public URL + anon key. Never map secrets here.
+// can omit NEXT_PUBLIC_* for the public URL + publishable key. Never map secrets here.
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL:

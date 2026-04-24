@@ -1,0 +1,33 @@
+# One path per line, in order. Lines starting with # are ignored.
+# Run from repo root: ./supabase/apply/apply.sh
+# Or paste into psql / Supabase SQL editor in this order.
+
+# --- A. User prefs ---
+supabase/tables/010_user_settings.sql
+
+# --- B. Studios & RBAC core (order matters: studios before profiles policies on studios) ---
+supabase/tables/020_studios.sql
+supabase/tables/021_studio_memberships.sql
+supabase/tables/022_tutor_student_links.sql
+supabase/tables/023_rbac_policies.sql
+
+# --- C. Games & practice (031 depends on games; 031 policy depends on studio_memberships) ---
+supabase/tables/030_games.sql
+supabase/tables/031_practice_sessions.sql
+supabase/tables/032_game_items.sql
+supabase/tables/033_user_game_item_state.sql
+supabase/tables/034_game_events.sql
+supabase/tables/035_game_seed_policies.sql
+supabase/tables/036_practice_sessions_cleanup.sql
+
+# --- D. Profiles & platform roles (trigger on auth.users; policies reference studios) ---
+supabase/tables/040_profiles.sql
+supabase/tables/041_tutor_student_links_status.sql
+supabase/tables/042_studio_tutor_join_requests.sql
+supabase/tables/043_rls_tutor_practice_profiles.sql
+supabase/tables/044_studio_owner_bootstrap.sql
+supabase/tables/045_studio_student_join_requests.sql
+supabase/tables/046_profiles_studio_peers.sql
+supabase/tables/047_profiles_join_request_visibility.sql
+supabase/tables/048_profiles_select_split.sql
+supabase/tables/049_studio_memberships_rls_no_recursion.sql

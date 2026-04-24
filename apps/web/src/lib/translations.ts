@@ -69,6 +69,7 @@ type TranslationMap = {
   startPractice: string; browseScales: string; browseChords: string; yourLibrary: string; libraryDesc: string;
   loadingPracticeContent: string;
   recentSessions: string; recentSessionsEmpty: string; sessionStatusCompleted: string; sessionStatusAbandoned: string; sessionStatusActive: string;
+  recentSessionsLoadMore: string; recentSessionsLoadingMore: string;
   sessionAccuracy: string; sessionItems: string; sessionStarted: string; sessionCram: string;
   weeklyProgress: string; weeklyProgressSub: string; weeklySessions: string; weeklyItemsCompleted: string; weeklyAverageAccuracy: string; weeklyNoActivity: string;
   statXp: string; statXpSub: string; weeklyXp: string; sessionXp: string;
@@ -355,6 +356,8 @@ const en: TranslationMap = {
   libraryDesc:        'A game-based jazz practice library across scales, chords, sequences, 2-5-1, and intervals, with adaptive review driven by your performance.',
   recentSessions:     'Recent Sessions',
   recentSessionsEmpty:'No sessions yet. Start practicing to build your history.',
+  recentSessionsLoadMore: 'Load more',
+  recentSessionsLoadingMore: 'Loading…',
   sessionStatusCompleted: 'Completed',
   sessionStatusAbandoned: 'Expired',
   sessionStatusActive: 'Active',
@@ -720,6 +723,8 @@ const zh: TranslationMap = {
   libraryDesc:        '一个基于游戏化结构的爵士练习库，涵盖音阶、和弦、音程序列、2-5-1 与音程，并根据你的表现自适应安排复习。',
   recentSessions:     '最近练习',
   recentSessionsEmpty:'还没有练习记录。开始练习后，这里会显示历史记录。',
+  recentSessionsLoadMore: '加载更多',
+  recentSessionsLoadingMore: '加载中…',
   sessionStatusCompleted: '已完成',
   sessionStatusAbandoned: '已超时',
   sessionStatusActive: '进行中',

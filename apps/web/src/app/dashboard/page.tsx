@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getSessionDeduped } from "@/lib/supabase/get-session-deduped"
 import { useDashboardStats } from "@/hooks/use-dashboard-stats"
-import { useRecentSessions } from "@/hooks/use-recent-sessions"
+import { useRecentSessionsInfinite } from "@/hooks/use-recent-sessions"
 import { useSessionTrend } from "@/hooks/use-session-trend"
 import { AppSidebar } from "@/components/app-sidebar"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -42,10 +42,17 @@ export default function DashboardPage() {
   const router = useRouter()
   const [authed, setAuthed] = useState(false)
   const { stats, isLoading: statsLoading } = useDashboardStats()
-  const { data: recentSessions, isLoading: sessionsLoading } = useRecentSessions()
+  const {
+    data: recentPages,
+    isLoading: sessionsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useRecentSessionsInfinite(5)
   const { trend, isLoading: trendLoading } = useSessionTrend()
   const { lang } = useLanguage()
   const tr = t(lang)
+  const recentSessions = (recentPages?.pages ?? []).flat()
 
   useEffect(() => {
     getSessionDeduped().then(({ data: { session } }) => {
@@ -248,8 +255,9 @@ export default function DashboardPage() {
               ) : !recentSessions || recentSessions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{tr.recentSessionsEmpty}</p>
               ) : (
-                <div className="space-y-3">
-                  {recentSessions.map((session) => {
+                <div className="max-h-[520px] overflow-auto pr-1">
+                  <div className="space-y-3">
+                    {recentSessions.map((session) => {
                     const accuracy = session.items_completed > 0
                       ? Math.round((session.correct_count / session.items_completed) * 100)
                       : 0
@@ -316,7 +324,21 @@ export default function DashboardPage() {
                         {body}
                       </div>
                     )
-                  })}
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {hasNextPage && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? tr.recentSessionsLoadingMore : tr.recentSessionsLoadMore}
+                  </Button>
                 </div>
               )}
             </CardContent>

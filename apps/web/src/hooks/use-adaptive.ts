@@ -14,6 +14,10 @@ export type AdaptiveWeights = Record<string, number>; // canonical_key -> weight
  * - recent wrong streak => higher weight
  * - no history => weight ~ 1
  */
+const ADAPTIVE_WINDOW = 600;
+/** Blend raw adaptive weight toward 1.0 so no family stays starved forever. */
+const ADAPTIVE_BLEND = 0.55;
+
 export function useAdaptiveWeights(gameSlug: string) {
   return useQuery({
     queryKey: ['adaptive-weights', 'game', gameSlug],
@@ -24,7 +28,7 @@ export function useAdaptiveWeights(gameSlug: string) {
         .select('is_correct,occurred_at,game_items!inner(canonical_key,games!inner(slug))')
         .eq('game_items.games.slug', gameSlug)
         .order('occurred_at', { ascending: false })
-        .limit(600);
+        .limit(ADAPTIVE_WINDOW);
 
       if (error) throw error;
 
@@ -50,8 +54,9 @@ export function useAdaptiveWeights(gameSlug: string) {
         }
 
         // Base 1.0, then boost.
-        const w = 1 + wrongRate * 3 + streakWrong * 0.6;
-        weights[k] = Math.max(0.25, Math.min(6, w));
+        const raw = 1 + wrongRate * 3 + streakWrong * 0.6;
+        const clamped = Math.max(0.25, Math.min(6, raw));
+        weights[k] = ADAPTIVE_BLEND * clamped + (1 - ADAPTIVE_BLEND) * 1;
       }
 
       return weights;

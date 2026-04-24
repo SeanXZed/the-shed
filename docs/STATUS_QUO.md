@@ -38,7 +38,7 @@ A **monorepo** for a web app (“The Shed”) focused on **jazz practice / learn
 ## Deployment
 
 - **Railpack / Railway** builds with `pnpm --filter @the-shed/web build` and starts with `pnpm --filter @the-shed/web start`.
-- Set **Supabase URL**, **publishable (anon) key**, and **service/secret key** in the host’s environment (names are documented in the plan doc; `next.config` can map some `SUPABASE_*` vars to `NEXT_PUBLIC_*` at build time).
+- Set **Supabase URL**, **`SUPABASE_PUBLISHABLE_KEY`**, and **`SUPABASE_SECRET_KEY`** (server-only) in the host’s environment (see `docs/DUOLINGO_FOR_JAZZ_PLAN.md`; `next.config` maps `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` into `NEXT_PUBLIC_*` at build time).
 
 ## Gaps / expectations
 

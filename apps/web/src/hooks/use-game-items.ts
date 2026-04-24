@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 
@@ -44,7 +45,8 @@ export function useDueGameItems(gameSlug: string) {
         .eq('game_items.games.slug', gameSlug)
         .lte('next_review', nowIso)
         .order('next_review', { ascending: true })
-        .limit(800);
+        // Large cap: due backlog is ordered by next_review; a low cap can exclude whole key families.
+        .limit(2000);
       if (error) throw error;
       return (data ?? [])
         .map((row) => {
@@ -58,13 +60,13 @@ export function useDueGameItems(gameSlug: string) {
 
 export function useInvalidateGameItems() {
   const qc = useQueryClient();
-  return (gameSlug?: string) => {
+  return useCallback((gameSlug?: string) => {
     if (gameSlug) {
       qc.invalidateQueries({ queryKey: ['game-items', 'all', gameSlug] });
       qc.invalidateQueries({ queryKey: ['game-items', 'due', gameSlug] });
       return;
     }
     qc.invalidateQueries({ queryKey: ['game-items'] });
-  };
+  }, [qc]);
 }
 

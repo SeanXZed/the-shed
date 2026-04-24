@@ -1,17 +1,27 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseRlsClient, getUserId } from '@/lib/supabase/server';
 
+const allowedSlugs = new Set(['full_scale', 'full_chord', 'sequence', 'progression_251', 'interval']);
+
 export async function POST(request: Request) {
   const userId = await getUserId(request);
   if (!userId) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
   const db = getSupabaseRlsClient(request);
 
-  // Fetch all game_items ids (seeded elsewhere). We keep it simple and idempotent:
-  // create a state row for every item the user might encounter.
-  const { data: items, error: itemsError } = await db
+  const url = new URL(request.url);
+  const gameSlug = url.searchParams.get('game_slug');
+  const gameSlugSafe = gameSlug && allowedSlugs.has(gameSlug) ? gameSlug : null;
+
+  // Fetch game_items ids (seeded elsewhere). Keep idempotent; prefer scoping by `game_slug`
+  // to avoid write amplification as the global catalog grows.
+  const itemsQuery = db
     .from('game_items')
-    .select('id');
+    .select('id,games!inner(slug)');
+
+  const { data: items, error: itemsError } = gameSlugSafe
+    ? await itemsQuery.eq('games.slug', gameSlugSafe)
+    : await itemsQuery;
 
   if (itemsError) {
     return NextResponse.json({ error: 'Failed to load game_items', detail: itemsError.message }, { status: 500 });
@@ -20,7 +30,7 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
   const rows = (items ?? []).map((it) => ({
     user_id: userId,
-    game_item_id: it.id,
+    game_item_id: (it as { id: string }).id,
     ease_factor: 2.5,
     interval_days: 1,
     repetitions: 0,

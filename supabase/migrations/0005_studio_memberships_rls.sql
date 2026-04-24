@@ -1,6 +1,0 @@
--- 0005_studio_memberships_rls.sql
--- Fixes infinite recursion in studio_memberships RLS (policies must not subquery the same table).
---
--- Apply: supabase/tables/049_studio_memberships_rls_no_recursion.sql
---
--- Intentionally empty (ordering-only). See file above.

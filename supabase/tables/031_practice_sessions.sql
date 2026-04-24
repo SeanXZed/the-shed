@@ -52,3 +52,19 @@ drop policy if exists "practice_sessions_delete_own" on public.practice_sessions
 create policy "practice_sessions_delete_own" on public.practice_sessions
   for delete using (auth.uid() = user_id);
 
+-- Studio staff (owner/admin/tutor) may read members' session rows (Studio → practice results).
+-- Depends on public.studio_memberships (apply 021_studio_memberships.sql first).
+drop policy if exists "practice_sessions_select_studio_staff" on public.practice_sessions;
+create policy "practice_sessions_select_studio_staff" on public.practice_sessions
+  for select
+  using (
+    exists (
+      select 1
+      from public.studio_memberships staff
+      join public.studio_memberships member
+        on member.studio_id = staff.studio_id
+      where staff.user_id = auth.uid()
+        and staff.role in ('owner', 'admin', 'tutor')
+        and member.user_id = practice_sessions.user_id
+    )
+  );

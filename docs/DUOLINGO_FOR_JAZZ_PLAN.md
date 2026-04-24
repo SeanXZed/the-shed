@@ -149,12 +149,12 @@ Until RBAC is implemented, instrument pitch (Concert / B♭ / E♭) is driven by
 
 **Naming (product vs SQL)**
 
-- **Superadmin** — platform operator (`profiles.is_superadmin`). Manages all auth users via **server-only** Admin API (`SUPABASE_SERVICE_ROLE_KEY`). UI: **System settings** (`/system-settings`), hidden from non-superadmins.
+- **Superadmin** — platform operator (`profiles.is_superadmin`). Manages all auth users via **server-only** Admin API (requires `SUPABASE_SECRET_KEY`). UI: **System settings** (`/system-settings`), hidden from non-superadmins.
 - **Platform tutor** — `profiles.is_tutor`. **Superadmin** grants or revokes it in System settings. Only **Superadmins** and **platform tutors** may **create studios** (RLS on `studios` insert); everyone else registers as a non-tutor and can still join studios via slug / requests.
 - **Studio `admin`** — reserved in `studio_memberships.role` for future large-school orgs; **no UI yet** and not assigned by default.
 - **Studio roles in use**: `owner` (creator of a studio), `tutor`, `student`. Owner is the primary studio manager; **studio** creation is **not** a client-only membership insert (see bootstrap trigger below).
 
-**SQL apply order** (migration `supabase/migrations/0004_roles.sql` is ordering-only; run files in this sequence):
+**SQL apply order** (full order for a fresh DB: `supabase/apply/apply-order.txt` / `./supabase/apply/apply.sh`; the “profiles + studio” block below is this segment only):
 
 1. `supabase/tables/040_profiles.sql` — `profiles` (including `is_tutor`), `is_superadmin()` / `is_tutor()`, `handle_new_user` trigger on `auth.users`, RLS, `profiles_prevent_platform_role_escalation` trigger, and **strict** `studios_insert_own` (only Superadmin or platform tutor may create studios; replaces the permissive policy from `020_studios.sql`). (If your environment rejects triggers on `auth.users`, run this block in the Supabase SQL editor with sufficient privileges.)
 2. `supabase/tables/041_tutor_student_links_status.sql` — `tutor_student_links.status` (`pending` | `accepted` | `rejected`), default `accepted` for tutor-created rows.
@@ -165,12 +165,12 @@ Until RBAC is implemented, instrument pitch (Concert / B♭ / E♭) is driven by
 7. `supabase/tables/046_profiles_studio_peers.sql` — members of the same studio can read each other’s `profiles` (rosters).
 8. `supabase/tables/047_profiles_join_request_visibility.sql` — owners see requester profiles for pending join requests; tutors see student profiles for pending tutor–student links.
 9. `supabase/tables/048_profiles_select_split.sql` — split `profiles` SELECT policies so “own row” does not depend on `is_superadmin()` (fixes client reads / sidebar Superadmin visibility).
-10. `supabase/tables/049_studio_memberships_rls_no_recursion.sql` — replace `studio_memberships` policies that subqueried the same table (PostgreSQL: “infinite recursion detected in policy”). Uses `is_member_of_studio` / `member_role_in_studio` (`SECURITY DEFINER`). Ordering: `supabase/migrations/0005_studio_memberships_rls.sql`.
+10. `supabase/tables/049_studio_memberships_rls_no_recursion.sql` — replace `studio_memberships` policies that subqueried the same table (PostgreSQL: “infinite recursion detected in policy”). Uses `is_member_of_studio` / `member_role_in_studio` (`SECURITY DEFINER`).
 
 **Environment**
 
-- **Public (browser) Supabase URL + anon/publishable key:** either `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, or **`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`** — `apps/web/next.config.ts` maps the latter into `NEXT_PUBLIC_*` at build time. Do **not** put the service secret in `NEXT_PUBLIC_*`.
-- `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY` — **server only** (same role key; the app accepts either). Required for Superadmin user management (`/api/admin/users`, `GET`/`POST`/`DELETE`/`PATCH`).
+- **Public (browser) URL + publishable key:** either `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, or **`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`** — `apps/web/next.config.ts` maps the latter into `NEXT_PUBLIC_*` at build time. Do **not** put the service secret in `NEXT_PUBLIC_*`.
+- `SUPABASE_SECRET_KEY` (preferred; same privilege as the legacy `SUPABASE_SERVICE_ROLE_KEY`) — **server only**. Required for Superadmin user management (`/api/admin/users`, `GET`/`POST`/`DELETE`/`PATCH`) and server-side catalog `ensure` routes.
 
 **First Superadmin (manual)**
 
@@ -297,7 +297,7 @@ Historically, the `cards` table served double duty and also coupled several game
 - a **content catalog** (seeded per user), and
 - the **per-user state** (SM-2 fields, last reviewed timestamps).
 
-To support truly independent games (Scale / Chord / Sequence / Chord Progression / Interval), curriculum nodes, and tutor reporting safely, these responsibilities were split into `games` + `game_items` + `user_game_item_state` + `game_events`. Legacy `cards` / `practice_events` **source** files were removed from `supabase/tables/` after migration (see `migrations/0001_init.sql` historical note). Remaining work is cleanup, parity verification, and any historical backfill still worth keeping.
+To support truly independent games (Scale / Chord / Sequence / Chord Progression / Interval), curriculum nodes, and tutor reporting safely, these responsibilities were split into `games` + `game_items` + `user_game_item_state` + `game_events`. Legacy `cards` / `practice_events` **source** files were removed from `supabase/tables/` after migration. Apply order for a full rebuild is in `supabase/apply/apply-order.txt`. Remaining work is cleanup, parity verification, and any historical backfill still worth keeping.
 
 **Migration order (high-level, with rollback in mind):**
 

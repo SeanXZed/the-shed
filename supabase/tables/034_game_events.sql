@@ -33,11 +33,8 @@ drop policy if exists "game_events_insert_own" on public.game_events;
 create policy "game_events_insert_own" on public.game_events
   for insert with check (auth.uid() = user_id);
 
+-- Append-only for learners: no update/delete (protects analytics / adaptive weights).
+-- Corrections: compensating events or service-role admin tooling.
 drop policy if exists "game_events_update_own" on public.game_events;
-create policy "game_events_update_own" on public.game_events
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
 drop policy if exists "game_events_delete_own" on public.game_events;
-create policy "game_events_delete_own" on public.game_events
-  for delete using (auth.uid() = user_id);
 

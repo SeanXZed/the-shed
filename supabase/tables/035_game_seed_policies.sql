@@ -1,28 +1,12 @@
--- TEMPORARY authoring policies for game catalog seeding.
+-- Game catalog writes (global `games` / `game_items` rows) are **not** exposed to arbitrary
+-- authenticated clients. Seeding is performed by server API routes using the Supabase
+-- service role (`/api/games/ensure`, `/api/game-items/ensure`).
 --
--- Purpose:
--- Allow authenticated users to insert `games` and `game_items` so the app can
--- lazily ensure catalog rows exist during the dual-write migration.
+-- RLS for these tables remains: SELECT for any authenticated user (see `030_games.sql`,
+-- `032_game_items.sql`). Inserts/updates to the catalog bypass RLS via service role.
 --
--- Long term:
--- Replace these with admin-only / authoring-only policies (e.g. studio owner/admin),
--- or move seeding behind a security definer function.
+-- Historical note: this file used to define temporary
+-- `games_insert_authed` / `game_items_insert_authed` policies. Those are removed; if your
+-- database still has them, apply `supabase/migrations/20260125120000_game_hardening_rls.sql`.
 
--- games
-drop policy if exists "games_insert_authed" on public.games;
-create policy "games_insert_authed" on public.games
-  for insert with check (auth.uid() is not null);
-
-drop policy if exists "games_update_authed" on public.games;
-create policy "games_update_authed" on public.games
-  for update using (auth.uid() is not null) with check (auth.uid() is not null);
-
--- game_items
-drop policy if exists "game_items_insert_authed" on public.game_items;
-create policy "game_items_insert_authed" on public.game_items
-  for insert with check (auth.uid() is not null);
-
-drop policy if exists "game_items_update_authed" on public.game_items;
-create policy "game_items_update_authed" on public.game_items
-  for update using (auth.uid() is not null) with check (auth.uid() is not null);
-
+-- Intentionally empty (policy removal lives in migration for existing DBs).

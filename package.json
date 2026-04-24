@@ -7,7 +7,8 @@
     "dev": "turbo dev",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "verify:game-catalog": "node scripts/verify-game-catalog.mjs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

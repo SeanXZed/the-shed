@@ -30,6 +30,9 @@ export {
 export { nextSM2State } from './theory/sm2';
 export { get251 } from './theory/twoFiveOne';
 
+// Game catalog
+export { buildGameSeedSpecs, CHORD_QUALITIES } from './gameCatalog/seedSpecs';
+
 // Types
 export type {
   Root,
